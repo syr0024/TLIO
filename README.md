@@ -2,7 +2,7 @@ _This code is a supplementary material to the paper "TLIO: Tight Learned Inertia
 
 
 HI
-
+HO
 
 # Installation
 All dependencies can be installed using conda via
