@@ -64,7 +64,11 @@ class SequencesDataset:
         #    os.path.join(self.data_path, f"{self.split}_list.txt"), 
         #    dtype=np.dtype(str),
         #)
+        print(self.data_path)
+        print(f"{self.split}_list.txt")
+        print(os.path.join(self.data_path, f"{self.split}_list.txt"))
         with open(os.path.join(self.data_path, f"{self.split}_list.txt")) as f:
+        # with open(os.path.join("/home/syr/github/TLIO/local_data/tlio_golden, f"{self.split}_list.txt")) as f:
             list_info = np.array([s.strip() for s in f.readlines() if len(s.strip()) > 0])
         
         # For picking exactly some particular sequences

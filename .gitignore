@@ -1,5 +1,6 @@
 local_data/*
-model/*
+models/*
+models/resnet/*
 *.txt
 *.zip
 *.mp4

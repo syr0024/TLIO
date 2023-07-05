@@ -12,25 +12,21 @@ from os import path as osp
 
 import numpy as np
 import torch
-from dataloader.dataset_fb import FbSequenceDataset
+# from dataloader.dataset_fb import FbSequenceDataset
+from dataloader.tlio_data import TlioData
 from network.losses import get_loss
 from network.model_factory import get_model
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from utils.logging import logging
-
-
-def get_datalist(list_path):
-    with open(list_path) as f:
-        data_list = [s.strip() for s in f.readlines() if len(s.strip()) > 0]
-    return data_list
+from utils.utils import to_device
 
 
 def torch_to_numpy(torch_arr):
     return torch_arr.cpu().detach().numpy()
 
 
-def get_inference(network, data_loader, device, epoch):
+def get_inference(network, data_loader, device, epoch, transforms=[]):
     """
     Obtain attributes from a data loader given a network state
     Outputs all targets, predicts, predicted covariance params, and losses in numpy arrays
@@ -39,9 +35,19 @@ def get_inference(network, data_loader, device, epoch):
     targets_all, preds_all, preds_cov_all, losses_all = [], [], [], []
     network.eval()
 
-    for bid, (feat, targ, _, _) in enumerate(data_loader):
-        pred, pred_cov = network(feat.to(device))
-        targ = targ.to(device)
+    for bid, sample in enumerate(data_loader):
+        sample = to_device(sample, device)
+        for transform in transforms:
+            sample = transform(sample)
+        feat = sample["feats"]["imu0"]
+        pred, pred_cov = network(feat)
+
+        if len(pred.shape) == 2:
+            targ = sample["targ_dt_World"][:, -1, :]
+        else:
+            # Leave off zeroth element since it's 0's. Ex: Net predicts 199 if there's 200 GT
+            targ = sample["targ_dt_World"][:, 1:, :].permute(0, 2, 1)
+
         loss = get_loss(pred, pred_cov, targ, epoch)
 
         targets_all.append(torch_to_numpy(targ))
@@ -62,7 +68,64 @@ def get_inference(network, data_loader, device, epoch):
     return attr_dict
 
 
-def do_train(network, train_loader, device, epoch, optimizer):
+def do_train(network, train_loader, device, epoch, optimizer, transforms=[]):
+    """
+    Train network for one epoch using a specified data loader
+    Outputs all targets, predicts, predicted covariance params, and losses in numpy arrays
+    """
+    train_targets, train_preds, train_preds_cov, train_losses = [], [], [], []
+    network.train()
+
+    # for bid, (feat, targ, _, _) in enumerate(train_loader):
+    for bid, sample in enumerate(train_loader):
+        sample = to_device(sample, device)
+        for transform in transforms:
+            sample = transform(sample)
+        feat = sample["feats"]["imu0"]
+        optimizer.zero_grad()
+        pred, pred_cov = network(feat)
+
+        if len(pred.shape) == 2:
+            targ = sample["targ_dt_World"][:, -1, :]
+        else:
+            # Leave off zeroth element since it's 0's. Ex: Net predicts 199 if there's 200 GT
+            targ = sample["targ_dt_World"][:, 1:, :].permute(0, 2, 1)
+
+        loss = get_loss(pred, pred_cov, targ, epoch)
+
+        train_targets.append(torch_to_numpy(targ))
+        train_preds.append(torch_to_numpy(pred))
+        train_preds_cov.append(torch_to_numpy(pred_cov))
+        train_losses.append(torch_to_numpy(loss))
+
+        # print("Loss full: ", loss)
+
+        loss = loss.mean()
+        loss.backward()
+
+        # print("Loss mean: ", loss.item())
+
+        # print("Gradients:")
+        # for name, param in network.named_parameters():
+        #    if param.requires_grad:
+        #        print(name, ": ", param.grad)
+
+        torch.nn.utils.clip_grad_norm_(network.parameters(), 0.1, error_if_nonfinite=True)
+        optimizer.step()
+
+    train_targets = np.concatenate(train_targets, axis=0)
+    train_preds = np.concatenate(train_preds, axis=0)
+    train_preds_cov = np.concatenate(train_preds_cov, axis=0)
+    train_losses = np.concatenate(train_losses, axis=0)
+    train_attr_dict = {
+        "targets": train_targets,
+        "preds": train_preds,
+        "preds_cov": train_preds_cov,
+        "losses": train_losses,
+    }
+    return train_attr_dict
+
+def do_train_R(network, train_loader, device, epoch, optimizer):
     """
     Train network for one epoch using a specified data loader
     Outputs all targets, predicts, predicted covariance params, and losses in numpy arrays
@@ -74,7 +137,7 @@ def do_train(network, train_loader, device, epoch, optimizer):
         feat, targ = feat.to(device), targ.to(device)
         optimizer.zero_grad()
         pred, pred_cov = network(feat)
-        loss = get_loss(pred, pred_cov, targ, epoch)
+        # loss = loss_so3(pred, pred_cov, targ, epoch)
 
         train_targets.append(torch_to_numpy(targ))
         train_preds.append(torch_to_numpy(pred))
@@ -97,13 +160,18 @@ def do_train(network, train_loader, device, epoch, optimizer):
     }
     return train_attr_dict
 
-
 def write_summary(summary_writer, attr_dict, epoch, optimizer, mode):
     """ Given the attr_dict write summary and log the losses """
 
     mse_loss = np.mean((attr_dict["targets"] - attr_dict["preds"]) ** 2, axis=0)
     ml_loss = np.average(attr_dict["losses"])
     sigmas = np.exp(attr_dict["preds_cov"])
+    # If it's sequential, take the last one
+    if len(mse_loss.shape) == 2:
+        assert mse_loss.shape[0] == 3
+        mse_loss = mse_loss[:, -1]
+        assert sigmas.shape[1] == 3
+        sigmas = sigmas[:, :, -1]
     summary_writer.add_scalar(f"{mode}_loss/loss_x", mse_loss[0], epoch)
     summary_writer.add_scalar(f"{mode}_loss/loss_y", mse_loss[1], epoch)
     summary_writer.add_scalar(f"{mode}_loss/loss_z", mse_loss[2], epoch)
@@ -121,9 +189,11 @@ def write_summary(summary_writer, attr_dict, epoch, optimizer, mode):
     )
 
 
-def save_model(args, epoch, network, optimizer, interrupt=False):
+def save_model(args, epoch, network, optimizer, best, interrupt=False):
     if interrupt:
         model_path = osp.join(args.out_dir, "checkpoints", "checkpoint_latest.pt")
+    if best:
+        model_path = osp.join(args.out_dir, "checkpoint_best.pt")
     else:
         model_path = osp.join(args.out_dir, "checkpoints", "checkpoint_%d.pt" % epoch)
     state_dict = {
@@ -164,12 +234,12 @@ def arg_conversion(args):
     )
     net_config = {
         "in_dim": (
-            data_window_config["past_data_size"]
-            + data_window_config["window_size"]
-            + data_window_config["future_data_size"]
-        )
-        // 32
-        + 1
+                          data_window_config["past_data_size"]
+                          + data_window_config["window_size"]
+                          + data_window_config["future_data_size"]
+                  )
+                  // 32
+                  + 1
     }
 
     return data_window_config, net_config
@@ -183,8 +253,8 @@ def net_train(args):
     try:
         if args.root_dir is None:
             raise ValueError("root_dir must be specified.")
-        if args.train_list is None:
-            raise ValueError("train_list must be specified.")
+        # if args.train_list is None:
+        #    raise ValueError("train_list must be specified.")
         if args.out_dir is not None:
             if not osp.isdir(args.out_dir):
                 os.makedirs(args.out_dir)
@@ -193,14 +263,14 @@ def net_train(args):
             if not osp.isdir(osp.join(args.out_dir, "logs")):
                 os.makedirs(osp.join(args.out_dir, "logs"))
             with open(
-                os.path.join(args.out_dir, "parameters.json"), "w"
+                    os.path.join(args.out_dir, "parameters.json"), "w"
             ) as parameters_file:
                 parameters_file.write(json.dumps(vars(args), sort_keys=True, indent=4))
             logging.info(f"Training output writes to {args.out_dir}")
         else:
             raise ValueError("out_dir must be specified.")
-        if args.val_list is None:
-            logging.warning("val_list is not specified.")
+        # if args.val_list is None:
+        #    logging.warning("val_list is not specified.")
         if args.continue_from is not None:
             if osp.exists(args.continue_from):
                 logging.info(
@@ -239,7 +309,19 @@ def net_train(args):
 
     train_loader, val_loader = None, None
     start_t = time.time()
-    train_list = get_datalist(args.train_list)
+
+    data = TlioData(
+        args.root_dir,
+        batch_size=args.batch_size,
+        dataset_style=args.dataset_style,
+        num_workers=args.workers,
+        persistent_workers=args.persistent_workers,
+    )
+    data.prepare_data()
+
+    train_list = data.get_datalist("train")
+
+    """
     try:
         train_dataset = FbSequenceDataset(
             args.root_dir, train_list, args, data_window_config, mode="train"
@@ -250,12 +332,18 @@ def net_train(args):
     except OSError as e:
         logging.error(e)
         return
+    """
+    train_loader = data.train_dataloader()
+    train_transforms = data.get_train_transforms()
+
     end_t = time.time()
     logging.info(f"Training set loaded. Loading time: {end_t - start_t:.3f}s")
-    logging.info(f"Number of train samples: {len(train_dataset)}")
+    logging.info(f"Number of train samples: {len(data.train_dataset)}")
 
-    if args.val_list is not None:
-        val_list = get_datalist(args.val_list)
+    # if args.val_list is not None:
+    if data.val_dataset is not None:
+        val_list = data.get_datalist("val")
+        """
         try:
             val_dataset = FbSequenceDataset(
                 args.root_dir, val_list, args, data_window_config, mode="val"
@@ -264,15 +352,16 @@ def net_train(args):
         except OSError as e:
             logging.error(e)
             return
+        """
+        val_loader = data.val_dataloader()
         logging.info("Validation set loaded.")
-        logging.info(f"Number of val samples: {len(val_dataset)}")
+        logging.info(f"Number of val samples: {len(data.val_dataset)}")
 
     device = torch.device(
         "cuda:0" if torch.cuda.is_available() and not args.cpu else "cpu"
     )
-    network = get_model(args.arch, net_config, args.input_dim, args.output_dim).to(
-        device
-    )
+    network = get_model(args.arch, net_config, args.input_dim, args.output_dim)
+    network.to(device)
     total_params = network.get_num_params()
     logging.info(f'Network "{args.arch}" loaded to device {device}')
     logging.info(f"Total number of parameters: {total_params}")
@@ -306,16 +395,17 @@ def net_train(args):
     summary_writer.add_text("info", f"total_param: {total_params}")
 
     logging.info(f"-------------- Init, Epoch {start_epoch} --------------")
-    attr_dict = get_inference(network, train_loader, device, start_epoch)
-    write_summary(summary_writer, attr_dict, start_epoch, optimizer, "train")
-    if val_loader is not None:
-        attr_dict = get_inference(network, val_loader, device, start_epoch)
-        write_summary(summary_writer, attr_dict, start_epoch, optimizer, "val")
+
+    # attr_dict = get_inference(network, train_loader, device, start_epoch, train_transforms)
+    # write_summary(summary_writer, attr_dict, start_epoch, optimizer, "train")
+    # if val_loader is not None:
+    #    attr_dict = get_inference(network, val_loader, device, start_epoch)
+    #    write_summary(summary_writer, attr_dict, start_epoch, optimizer, "val")
 
     def stop_signal_handler(args, epoch, network, optimizer, signal, frame):
         logging.info("-" * 30)
         logging.info("Early terminate")
-        save_model(args, epoch, network, optimizer, interrupt=True)
+        save_model(args, epoch, network, optimizer, best=False, interrupt=True)
         sys.exit()
 
     best_val_loss = np.inf
@@ -330,19 +420,25 @@ def net_train(args):
 
         logging.info(f"-------------- Training, Epoch {epoch} ---------------")
         start_t = time.time()
-        train_attr_dict = do_train(network, train_loader, device, epoch, optimizer)
+        train_attr_dict = do_train(network, train_loader, device, epoch, optimizer, train_transforms)
         write_summary(summary_writer, train_attr_dict, epoch, optimizer, "train")
         end_t = time.time()
         logging.info(f"time usage: {end_t - start_t:.3f}s")
+
+        # start_t = time.time()
+        # train_attr_dict = do_train_R(network_R, train_loader, device, epoch, optimizer, train_transforms)
+        # write_summary(summary_writer, train_attr_dict, epoch, optimizer, "train")
+        # end_t = time.time()
+        # logging.info(f"time usage for orientation network: {end_t - start_t:.3f}s")
 
         if val_loader is not None:
             val_attr_dict = get_inference(network, val_loader, device, epoch)
             write_summary(summary_writer, val_attr_dict, epoch, optimizer, "val")
             if np.mean(val_attr_dict["losses"]) < best_val_loss:
                 best_val_loss = np.mean(val_attr_dict["losses"])
-                save_model(args, epoch, network, optimizer)
+                save_model(args, epoch, network, optimizer, best=True)
         else:
-            save_model(args, epoch, network, optimizer)
+            save_model(args, epoch, network, optimizer, best=False)
 
     logging.info("Training complete.")
 
