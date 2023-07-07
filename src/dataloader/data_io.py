@@ -93,3 +93,5 @@ class DataIO:
         Ri_z = Rotation.from_euler("z", vio_eul[2]).as_matrix()
         meas = Ri_z.T.dot(vio_meas.reshape((3, 1)))
         return meas, meas_cov
+
+    # def get_R_from_vio(self, ts_oldest_state, ts_end):
