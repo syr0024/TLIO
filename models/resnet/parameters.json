@@ -17,7 +17,7 @@
     "model_path": null,
     "out_dir": "../models/resnet",
     "out_name": null,
-    "output_dim": 3,
+    "output_dim": 6,
     "past_time": 0.0,
     "persistent_workers": true,
     "perturb_gravity": true,

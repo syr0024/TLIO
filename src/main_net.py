@@ -34,7 +34,7 @@ if __name__ == "__main__":
     parser.add_argument("--arch", type=str, default="resnet")
     parser.add_argument("--cpu", action="store_true")
     parser.add_argument("--input_dim", type=int, default=6)
-    parser.add_argument("--output_dim", type=int, default=3)
+    parser.add_argument("--output_dim", type=int, default=6)
     parser.add_argument("-j", "--workers", type=int, default=4)
     parser.add_argument("--dataset_style", type=str, default="mmap", 
             help="'ram', 'mmap', or 'iter'. See dataloader/tlio_data.py for more details")

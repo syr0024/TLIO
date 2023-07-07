@@ -12,58 +12,63 @@ SO(3) loss
 
 input: 
   pred: Nx6 tensor of network orientation 1,2 column of orientation matrix output
-  targ: Nx6 tensor of gt 1,2 column of orientation matrix
+  targ: Nx3x3x(Hz-1) tensor of gt 1,2 column of orientation matrix
 output:
   loss: Nx6 matrix of SO(3) loss on rotation matrix ?
 """
 
 
-def loss_mse_so3(pred, trag):
+def loss_mse_so3(pred, targ):
+
+    # pres, targ is torch.tensor
+    if pred.dim() < 3:
+        pred = pred.unsqueeze(2)
+        targ = targ.unsqueeze(2)
 
     pred = sixD2so3(pred)
-    trag = sixD2so3(trag)
-    loss = (so3_log(pred*trag.transpose(1, 2))).norm(dim=(1, 2))**2
+
+    loss = ((pred - targ).norm(dim=(1,2))**2)
 
     return loss
 
 
-def loss_NLL_so3(pred, pred_cov, trag):
+def loss_NLL_so3(pred, pred_cov, targ):
+
+    if pred.dim() < 3:
+        pred = pred.unsqueeze(0)
+        targ = targ.unsqueeze(0)
 
     pred = sixD2so3(pred)
-    trag = sixD2so3(trag)
-    pred_cov = sixD2so3(pred_cov) # Must be replaced with a covariance matrix
-    # cov_mat =
-    loss = 0.5*(pred - trag).transpose(1, 2)/cov_mat*(pred - trag) - 0.5*logdet3(cov_mat)
+    pred_cov = pred_cov.diag()
+    
+    residual = so3_log(pred.bmm(targ.transpose(1,2))).unsqueeze(2)
+    
+    weighted_term = 0.5 * residual.transpose(1, 2).bmm(pred_cov).bmm(residual)
+    loss = weighted_term.squeeze() - 0.5 * logdet3(pred_cov)
+
     return loss
 
 
 def sixD2so3(sixD):
     ## two vector of network output
-    sixDnp = sixD.numpy()  # numpy
-    a1 = sixDnp[:3]
-    a2 = sixDnp[3:]
+    a1 = sixD[:, :3, :]  # (1024,6,199)
+    a2 = sixD[:, 3:, :]  # (1024,6,199)
 
-    ## b1
-    a1_norm = np.linalg.norm(a1)
-    b1 = a1 / a1_norm
+    ## b1 : (1024,1,199)
+    a1_norm = a1.norm(dim=1, keepdim=True)
+    b1 = a1 / a1_norm   # (1024,3,199)
 
     ## b2
-    b2 = a2 - np.dot(b1, a2) * b1
-    b2_norm = np.linalg.norm(b2)
-    b2 = b2/b2_norm
+    b1a2 = torch.einsum('ijk,ijk->ik', b1, a2).unsqueeze(1)
+    b2 = a2 - b1a2 * b1
+    b2_norm = b2.norm(dim=1, keepdim=True)
+    b2 = b2 / b2_norm
 
-    ## b3
-    e1 = np.array([1, 0, 0], dtype=np.float32)
-    e2 = np.array([0, 1, 0], dtype=np.float32)
-    e3 = np.array([0, 0, 1], dtype=np.float32)
-    b31 = np.linalg.det(np.concatenate([b1[:, None], b2[:, None], e1[:, None]], axis=1))
-    b32 = np.linalg.det(np.concatenate([b1[:, None], b2[:, None], e2[:, None]], axis=1))
-    b33 = np.linalg.det(np.concatenate([b1[:, None], b2[:, None], e3[:, None]], axis=1))
-    b3 = np.array([b31, b32, b33])
+    ## b3 (b1, b2 외적)
+    b3 = torch.cross(b1, b2, 1)
 
-    ## reconstructed rotation
-    R = np.concatenate([b1[:,None], b2[:,None], b3[:,None]], axis=1)
-    _ = torch.from_numpy(R)  # tensor
+    ## rotation matrix : (1024,3,3,199)
+    R = torch.stack((b1, b2, b3), 2)
 
     return R
 
@@ -141,15 +146,26 @@ output:
 
 
 def get_loss(pred, pred_logstd, targ, epoch):
-    """
+
     if epoch < 10:
         loss = loss_mse(pred, targ)
     else:
         loss = loss_distribution_diag(pred, pred_logstd, targ)
-    """
 
+    """
     if epoch < 10:
         pred_logstd = pred_logstd.detach()
 
     loss = loss_distribution_diag(pred, pred_logstd, targ)
+    """
+    return loss
+
+
+def get_loss_so3(pred, pred_logstd, targ, epoch):
+
+    if epoch < 10:
+        loss = loss_mse_so3(pred, targ)
+    else:
+        loss = loss_NLL_so3(pred, pred_logstd, targ)
+
     return loss
