@@ -228,6 +228,9 @@ def write_summary(summary_writer, attr_dict, epoch, optimizer, mode):
     mse_loss = np.mean((attr_dict["targets"] - attr_dict["preds"]) ** 2, axis=0)  #shape (3,3)
     ml_loss = np.average(attr_dict["losses"])  #shape (1)
     sigmas = np.exp(attr_dict["preds_cov"])  #shape (3,3)
+    print("mse_loss size: "+mse_loss().size())
+    print("ml_loss size: "+ml_loss().size())
+    print("sigmas size: "+sigmas().size())
     # If it's sequential, take the last one
     # if len(mse_loss.shape) == 2:
     #     assert mse_loss.shape[0] == 3
@@ -239,7 +242,7 @@ def write_summary(summary_writer, attr_dict, epoch, optimizer, mode):
     summary_writer.add_histogram(f"{mode}_hist/sigma_x", sigmas[:, 0], epoch)
     summary_writer.add_histogram(f"{mode}_hist/sigma_y", sigmas[:, 1], epoch)
     summary_writer.add_histogram(f"{mode}_hist/sigma_z", sigmas[:, 2], epoch)
-    summary_writer.add_histogram(f"{mode}_hist/sigma_z", np.mean(sigmas), epoch)
+    summary_writer.add_histogram(f"{mode}_hist/sigma_z", np.mean(sigmas, axis=0), epoch)
     if epoch > 0:
         summary_writer.add_scalar(
             "optimizer/lr", optimizer.param_groups[0]["lr"], epoch - 1
