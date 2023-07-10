@@ -232,9 +232,12 @@ def write_summary(summary_writer, attr_dict, epoch, optimizer, mode):
         mse_loss = mse_loss[:, -1]
         assert sigmas.shape[1] == 3
         sigmas = sigmas[:, :, -1]
-    summary_writer.add_scalar(f"{mode}_loss/loss_x", mse_loss[0], epoch)
-    summary_writer.add_scalar(f"{mode}_loss/loss_y", mse_loss[1], epoch)
-    summary_writer.add_scalar(f"{mode}_loss/loss_z", mse_loss[2], epoch)
+    summary_writer.add_scalar(f"{mode}_loss/loss_a11", mse_loss[0], epoch)
+    summary_writer.add_scalar(f"{mode}_loss/loss_a12", mse_loss[1], epoch)
+    summary_writer.add_scalar(f"{mode}_loss/loss_a13", mse_loss[2], epoch)
+    summary_writer.add_scalar(f"{mode}_loss/loss_a21", mse_loss[3], epoch)
+    summary_writer.add_scalar(f"{mode}_loss/loss_a22", mse_loss[4], epoch)
+    summary_writer.add_scalar(f"{mode}_loss/loss_a23", mse_loss[5], epoch)
     summary_writer.add_scalar(f"{mode}_loss/avg", np.mean(mse_loss), epoch)
     summary_writer.add_scalar(f"{mode}_dist/loss_full", ml_loss, epoch)
     summary_writer.add_histogram(f"{mode}_hist/sigma_x", sigmas[:, 0], epoch)

@@ -28,7 +28,7 @@ def loss_mse_so3(pred, targ):
     pred = sixD2so3(pred)
     targ = sixD2so3(targ)
 
-    loss = (pred - targ).pow(2).squeeze(3)
+    loss = (pred - targ).pow(2).squeeze()   # tensor(1024,3,3)
 
     return loss
 
@@ -50,10 +50,12 @@ def loss_NLL_so3(pred, pred_cov, targ):
     pred_cov = pred_cov.squeeze()
     targ = targ.squeeze()
 
-    residual = so3_log(pred.bmm(targ.transpose(1,2))).unsqueeze(2)
-    
-    weighted_term = 0.5 * residual.transpose(1,2).bmm(pred_cov).bmm(residual)
-    loss = weighted_term.squeeze() - 0.5 * torch.log((pred_cov[:, 0, 0]*pred_cov[:, 1, 1]*pred_cov[:, 2, 2])**2)
+    loss = ((pred - targ).pow(2)) / (2 * torch.exp(2 * pred_cov)) + pred_cov
+
+    # residual = so3_log(pred.bmm(targ.transpose(1,2))).unsqueeze(2)
+    #
+    # weighted_term = 0.5 * residual.transpose(1,2).bmm(pred_cov).bmm(residual)
+    # loss = weighted_term.squeeze() - 0.5 * torch.log((pred_cov[:, 0, 0]*pred_cov[:, 1, 1]*pred_cov[:, 2, 2])**2)
 
     return loss
 
@@ -147,7 +149,7 @@ def get_loss(pred, pred_logstd, targ, epoch):
 
 def get_loss_so3(pred, pred_logstd, targ, epoch):
 
-    if epoch < 10:
+    if epoch < 0:
         loss = loss_mse_so3(pred, targ)
     else:
         loss = loss_NLL_so3(pred, pred_logstd, targ)
