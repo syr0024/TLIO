@@ -68,6 +68,47 @@ def get_inference(network, data_loader, device, epoch, transforms=[]):
     }
     return attr_dict
 
+def get_inference_so3(network, data_loader, device, epoch, transforms=[]):
+    """
+    Obtain attributes from a data loader given a network state
+    Outputs all targets, predicts, predicted covariance params, and losses in numpy arrays
+    Enumerates the whole data loader
+    """
+    targets_all, preds_all, preds_cov_all, losses_all = [], [], [], []
+    network.eval()
+
+    for bid, sample in enumerate(data_loader):
+        sample = to_device(sample, device)
+        for transform in transforms:
+            sample = transform(sample)
+        feat = sample["feats"]["imu0"]
+        pred, pred_cov = network(feat)
+
+        if len(pred.shape) == 2:
+            targ = sample["targ_dR_World"][:, -1, :]
+        else:
+            # Leave off zeroth element since it's 0's. Ex: Net predicts 199 if there's 200 GT
+            targ = sample["targ_dR_World"][:, 1:, :].permute(0, 2, 1)
+
+        loss = get_loss_so3(pred, pred_cov, targ, epoch)
+
+        targets_all.append(torch_to_numpy(targ))
+        preds_all.append(torch_to_numpy(pred))
+        preds_cov_all.append(torch_to_numpy(pred_cov))
+        losses_all.append(torch_to_numpy(loss))
+
+    targets_all = np.concatenate(targets_all, axis=0)
+    preds_all = np.concatenate(preds_all, axis=0)
+    preds_cov_all = np.concatenate(preds_cov_all, axis=0)
+    losses_all = np.concatenate(losses_all, axis=0)
+    attr_dict = {
+        "targets": targets_all,
+        "preds": preds_all,
+        "preds_cov": preds_cov_all,
+        "losses": losses_all,
+    }
+    return attr_dict
+
 
 def do_train(network, train_loader, device, epoch, optimizer, transforms=[]):
     """
@@ -450,7 +491,7 @@ def net_train(args):
         # logging.info(f"time usage for orientation network: {end_t - start_t:.3f}s")
 
         if val_loader is not None:
-            val_attr_dict = get_inference(network, val_loader, device, epoch)
+            val_attr_dict = get_inference_so3(network, val_loader, device, epoch)
             write_summary(summary_writer, val_attr_dict, epoch, optimizer, "val")
             if np.mean(val_attr_dict["losses"]) < best_val_loss:
                 best_val_loss = np.mean(val_attr_dict["losses"])

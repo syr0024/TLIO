@@ -7,3 +7,4 @@ models/resnet/*
 *.avi
 *.wmv
 *.pyc
+*.pt
