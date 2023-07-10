@@ -83,14 +83,15 @@ def get_inference_so3(network, data_loader, device, epoch, transforms=[]):
             sample = transform(sample)
         feat = sample["feats"]["imu0"]
         pred, pred_cov = network(feat)
+        pred = sixD2so3(pred.unsqueeze(2)).squeeze()  # pred: (1024, 3, 3)
 
         if len(pred.shape) == 3:
-            targ = sample["targ_dR_World"][:, -1, :]
-            # targ = so32sixD(targ)
+            targ = sample["targ_dR_World"][:, -1, :, :]  # trag: (1024, 3, 3)
+            #targ = so32sixD(targ)  # trag: (1024, 6)
         else:
             # Leave off zeroth element since it's 0's. Ex: Net predicts 199 if there's 200 GT
-            targ = sample["targ_dR_World"][:, 1:, :].permute(0, 2, 1)
-            # targ = so32sixD(targ)
+            targ = sample["targ_dR_World"][:, 1:, :, :].permute(0, 2, 3, 1) # trag: (1024, 3, 3, 199)
+            #targ = so32sixD(targ)  # trag: (1024, 6, 199)
 
         loss = get_loss_so3(pred, pred_cov, targ, epoch)
 
