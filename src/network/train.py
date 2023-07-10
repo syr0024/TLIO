@@ -242,7 +242,7 @@ def write_summary(summary_writer, attr_dict, epoch, optimizer, mode):
     summary_writer.add_histogram(f"{mode}_hist/sigma_x", sigmas[:, 0], epoch)
     summary_writer.add_histogram(f"{mode}_hist/sigma_y", sigmas[:, 1], epoch)
     summary_writer.add_histogram(f"{mode}_hist/sigma_z", sigmas[:, 2], epoch)
-    summary_writer.add_histogram(f"{mode}_hist/sigma_z", np.mean(sigmas, axis=0), epoch)
+    summary_writer.add_histogram(f"{mode}_hist/sigma_z", np.mean(sigmas), epoch)
     if epoch > 0:
         summary_writer.add_scalar(
             "optimizer/lr", optimizer.param_groups[0]["lr"], epoch - 1

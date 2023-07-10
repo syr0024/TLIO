@@ -23,7 +23,7 @@ if __name__ == "__main__":
         "--root_dir", type=str, 
         default="local_data/tlio_golden", help="Path to data directory"
     )
-    parser.add_argument("--out_dir", type=str, default="outputs/resnet_seq")
+    parser.add_argument("--out_dir", type=str, default="outputs/resnet"+datetime.now().strftime("%Y-%m-%d-%H-%M-%S"))
     parser.add_argument("--model_path", type=str, default=None)
     parser.add_argument("--continue_from", type=str, default=None)
     parser.add_argument("--out_name", type=str, default=None)
