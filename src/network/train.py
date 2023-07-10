@@ -226,7 +226,7 @@ def write_summary(summary_writer, attr_dict, epoch, optimizer, mode):
     """ Given the attr_dict write summary and log the losses """
 
     mse_loss = np.mean((attr_dict["targets"] - attr_dict["preds"]) ** 2, axis=0)  #shape (3,3)
-    ml_loss = np.average(attr_dict["losses"])  #shape (3,3)
+    ml_loss = np.average(attr_dict["losses"])  #shape (1)
     sigmas = np.exp(attr_dict["preds_cov"])  #shape (3,3)
     # If it's sequential, take the last one
     # if len(mse_loss.shape) == 2:
@@ -309,7 +309,7 @@ def net_train(args):
     """
     Main function for network training
     """
-
+    # os.mkdir(args.model_path, exist_ok=True)
     try:
         if args.root_dir is None:
             raise ValueError("root_dir must be specified.")

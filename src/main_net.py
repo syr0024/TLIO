@@ -6,6 +6,7 @@ Output: 3x1 displacement, 3x1 covariance parameters
 
 import network
 from utils.argparse_utils import add_bool_arg
+import datetime
 
 
 if __name__ == "__main__":
