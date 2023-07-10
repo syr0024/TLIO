@@ -26,7 +26,7 @@ def loss_mse_so3(pred, targ):
         targ = targ.unsqueeze(2)
 
     pred = sixD2so3(pred)
-    targ = sixD2so3(targ)
+    # targ = sixD2so3(targ)
 
     loss = (pred - targ).pow(2).squeeze()   # tensor(1024,3,3)
 
@@ -43,7 +43,7 @@ def loss_NLL_so3(pred, pred_cov, targ):
     pred = sixD2so3(pred)
     diagonal_matrix = torch.eye(3).unsqueeze(0).unsqueeze(-1).cuda()
     pred_cov = pred_cov.unsqueeze(2) * diagonal_matrix
-    targ = sixD2so3(targ)
+    # targ = sixD2so3(targ)
 
     # Network output isn't 4th tensor
     pred = pred.squeeze()
@@ -149,7 +149,7 @@ def get_loss(pred, pred_logstd, targ, epoch):
 
 def get_loss_so3(pred, pred_logstd, targ, epoch):
 
-    if epoch < 10:
+    if epoch < 0:
         loss = loss_mse_so3(pred, targ)
     else:
         loss = loss_NLL_so3(pred, pred_logstd, targ)

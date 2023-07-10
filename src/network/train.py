@@ -86,11 +86,11 @@ def get_inference_so3(network, data_loader, device, epoch, transforms=[]):
 
         if len(pred.shape) == 2:
             targ = sample["targ_dR_World"][:, -1, :]
-            targ = so32sixD(targ)
+            # targ = so32sixD(targ)
         else:
             # Leave off zeroth element since it's 0's. Ex: Net predicts 199 if there's 200 GT
             targ = sample["targ_dR_World"][:, 1:, :].permute(0, 2, 1)
-            targ = so32sixD(targ)
+            # targ = so32sixD(targ)
 
         loss = get_loss_so3(pred, pred_cov, targ, epoch)
 
@@ -189,11 +189,11 @@ def do_train_R(network, train_loader, device, epoch, optimizer, transforms=[]):
 
         if len(pred.shape) == 2:
             targ = sample["targ_dR_World"][:, -1, :, :]  # trag: (1024, 3, 3)
-            targ = so32sixD(targ)  # trag: (1024, 6)
+            #targ = so32sixD(targ)  # trag: (1024, 6)
         else:
         # Leave off zeroth element since it's 0's. Ex: Net predicts 199 if there's 200 GT
             targ = sample["targ_dR_World"][:, 1:, :, :].permute(0, 2, 3, 1) # trag: (1024, 3, 3, 199)
-            targ = so32sixD(targ)  # trag: (1024, 6, 199)
+            #targ = so32sixD(targ)  # trag: (1024, 6, 199)
 
         loss = get_loss_so3(pred, pred_cov, targ, epoch)
 
@@ -232,17 +232,18 @@ def write_summary(summary_writer, attr_dict, epoch, optimizer, mode):
         mse_loss = mse_loss[:, -1]
         assert sigmas.shape[1] == 3
         sigmas = sigmas[:, :, -1]
-    summary_writer.add_scalar(f"{mode}_loss/loss_a11", mse_loss[0], epoch)
-    summary_writer.add_scalar(f"{mode}_loss/loss_a12", mse_loss[1], epoch)
-    summary_writer.add_scalar(f"{mode}_loss/loss_a13", mse_loss[2], epoch)
-    summary_writer.add_scalar(f"{mode}_loss/loss_a21", mse_loss[3], epoch)
-    summary_writer.add_scalar(f"{mode}_loss/loss_a22", mse_loss[4], epoch)
-    summary_writer.add_scalar(f"{mode}_loss/loss_a23", mse_loss[5], epoch)
+    # summary_writer.add_scalar(f"{mode}_loss/loss_a11", mse_loss[0], epoch)
+    # summary_writer.add_scalar(f"{mode}_loss/loss_a12", mse_loss[1], epoch)
+    # summary_writer.add_scalar(f"{mode}_loss/loss_a13", mse_loss[2], epoch)
+    # summary_writer.add_scalar(f"{mode}_loss/loss_a21", mse_loss[3], epoch)
+    # summary_writer.add_scalar(f"{mode}_loss/loss_a22", mse_loss[4], epoch)
+    # summary_writer.add_scalar(f"{mode}_loss/loss_a23", mse_loss[5], epoch)
     summary_writer.add_scalar(f"{mode}_loss/avg", np.mean(mse_loss), epoch)
     summary_writer.add_scalar(f"{mode}_dist/loss_full", ml_loss, epoch)
     summary_writer.add_histogram(f"{mode}_hist/sigma_x", sigmas[:, 0], epoch)
     summary_writer.add_histogram(f"{mode}_hist/sigma_y", sigmas[:, 1], epoch)
     summary_writer.add_histogram(f"{mode}_hist/sigma_z", sigmas[:, 2], epoch)
+    summary_writer.add_histogram(f"{mode}_hist/sigma_z", np.mean(sigmas), epoch)
     if epoch > 0:
         summary_writer.add_scalar(
             "optimizer/lr", optimizer.param_groups[0]["lr"], epoch - 1
