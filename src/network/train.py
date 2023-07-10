@@ -84,7 +84,7 @@ def get_inference_so3(network, data_loader, device, epoch, transforms=[]):
         feat = sample["feats"]["imu0"]
         pred, pred_cov = network(feat)
 
-        if len(pred.shape) == 2:
+        if len(pred.shape) == 3:
             targ = sample["targ_dR_World"][:, -1, :]
             # targ = so32sixD(targ)
         else:
@@ -224,12 +224,9 @@ def do_train_R(network, train_loader, device, epoch, optimizer, transforms=[]):
 def write_summary(summary_writer, attr_dict, epoch, optimizer, mode):
     """ Given the attr_dict write summary and log the losses """
 
-    mse_loss = np.mean((attr_dict["targets"] - attr_dict["preds"]) ** 2, axis=0)
-    ml_loss = np.average(attr_dict["losses"])
-    sigmas = np.exp(attr_dict["preds_cov"])
-    print("mse_loss_shape: ", mse_loss.shape)
-    print("ml_loss_shape: ", mse_loss.shape)
-    print("sigma_loss_shape: ", mse_loss.shape)
+    mse_loss = np.mean((attr_dict["targets"] - attr_dict["preds"]) ** 2, axis=0)  #shape (3,3)
+    ml_loss = np.average(attr_dict["losses"])  #shape (3,3)
+    sigmas = np.exp(attr_dict["preds_cov"])  #shape (3,3)
     # If it's sequential, take the last one
     # if len(mse_loss.shape) == 2:
     #     assert mse_loss.shape[0] == 3
