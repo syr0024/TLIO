@@ -228,9 +228,9 @@ def write_summary(summary_writer, attr_dict, epoch, optimizer, mode):
     mse_loss = np.mean((attr_dict["targets"] - attr_dict["preds"]) ** 2, axis=0)  #shape (3,3)
     ml_loss = np.average(attr_dict["losses"])  #shape (1)
     sigmas = np.exp(attr_dict["preds_cov"])  #shape (3,3)
-    print("mse_loss size: "+mse_loss().shape())
-    print("ml_loss size: "+ml_loss().shape())
-    print("sigmas size: "+sigmas().shape())
+    print("mse_loss size: "+mse_loss.shape())
+    print("ml_loss size: "+ml_loss.shape())
+    print("sigmas size: "+sigmas.shape())
     # If it's sequential, take the last one
     # if len(mse_loss.shape) == 2:
     #     assert mse_loss.shape[0] == 3
