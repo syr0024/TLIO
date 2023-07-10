@@ -9,6 +9,36 @@ import torch
 from .from_scipy import compute_q_from_matrix
 from .quiet_numba import jit
 
+def sixD2so3(sixD):
+    ## two vector of network output
+    a1 = sixD[:, :3, :]  # (1024,6)
+    a2 = sixD[:, 3:, :]  # (1024,6)
+
+    ## b1 : (1024,1)
+    a1_norm = a1.norm(dim=1, keepdim=True)
+    b1 = a1 / a1_norm   # (1024,3)
+
+    ## b2
+    b1a2 = torch.einsum('ijk,ijk->ik', b1, a2).unsqueeze(1)
+    b2 = a2 - b1a2 * b1
+    b2_norm = b2.norm(dim=1, keepdim=True)
+    b2 = b2 / b2_norm
+
+    ## b3 (b1, b2 외적)
+    b3 = torch.cross(b1, b2, 1)
+
+    ## rotation matrix : (1024,3,3)
+    R = torch.stack((b1, b2, b3), 2)
+
+    return R
+
+def so32sixD(so3):
+    if so3.dim() == 3:
+        sixD = torch.cat((so3[:,:,0], so3[:,:,1]), 1)
+    else:
+        sixD = torch.cat((so3[:,:,0,:], so3[:,:,1,:]), 2)
+
+    return sixD
 
 def logdet3(A):
     if A.dim() < 3:
