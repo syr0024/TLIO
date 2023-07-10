@@ -86,9 +86,11 @@ def get_inference_so3(network, data_loader, device, epoch, transforms=[]):
 
         if len(pred.shape) == 2:
             targ = sample["targ_dR_World"][:, -1, :]
+            targ = so32sixD(targ)
         else:
             # Leave off zeroth element since it's 0's. Ex: Net predicts 199 if there's 200 GT
             targ = sample["targ_dR_World"][:, 1:, :].permute(0, 2, 1)
+            targ = so32sixD(targ)
 
         loss = get_loss_so3(pred, pred_cov, targ, epoch)
 
