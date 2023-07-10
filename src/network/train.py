@@ -20,6 +20,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from utils.logging import logging
 from utils.utils import to_device
+from utils.math_utils import sixD2so3, so32sixD
 
 
 def torch_to_numpy(torch_arr):
@@ -93,7 +94,6 @@ def do_train(network, train_loader, device, epoch, optimizer, transforms=[]):
 
         loss = get_loss(pred, pred_cov, targ, epoch)
 
-
         train_targets.append(torch_to_numpy(targ))
         train_preds.append(torch_to_numpy(pred))
         train_preds_cov.append(torch_to_numpy(pred_cov))
@@ -145,10 +145,12 @@ def do_train_R(network, train_loader, device, epoch, optimizer, transforms=[]):
         pred, pred_cov = network(feat) # pred: (1024, 6) or (1024,6,199)
 
         if len(pred.shape) == 2:
-            targ = sample["targ_dR_World"][:, -1, :, :] # trag: (1024, 3, 3)
+            targ = sample["targ_dR_World"][:, -1, :, :]  # trag: (1024, 3, 3)
+            targ = so32sixD(targ)  # trag: (1024, 6)
         else:
         # Leave off zeroth element since it's 0's. Ex: Net predicts 199 if there's 200 GT
             targ = sample["targ_dR_World"][:, 1:, :, :].permute(0, 2, 3, 1) # trag: (1024, 3, 3, 199)
+            targ = so32sixD(targ)  # trag: (1024, 6, 199)
 
         loss = get_loss_so3(pred, pred_cov, targ, epoch)
 
@@ -160,7 +162,7 @@ def do_train_R(network, train_loader, device, epoch, optimizer, transforms=[]):
         loss = loss.mean()
         loss.backward()
 
-        torch.nn.utils.clip_grad_norm_(network.parameters(), 0.1, error_if_nonfinite=True)
+        torch.nn.utils.clip_grad_norm_(network.parameters(), 0.1, error_if_nonfinite=False)
         optimizer.step()
 
     train_targets = np.concatenate(train_targets, axis=0)

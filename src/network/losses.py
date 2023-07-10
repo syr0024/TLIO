@@ -3,7 +3,7 @@ import numpy as np
 from network.covariance_parametrization import DiagonalParam
 from utils.lie_algebra import so3_log
 from utils.from_scipy import compute_q_from_matrix
-from utils.math_utils import logdet3
+from utils.math_utils import logdet3, sixD2so3, so32sixD
 
 MIN_LOG_STD = np.log(1e-3)
 
@@ -12,7 +12,7 @@ SO(3) loss
 
 input: 
   pred: Nx6 tensor of network orientation 1,2 column of orientation matrix output
-  targ: Nx3x3x(Hz-1) tensor of gt 1,2 column of orientation matrix
+  targ: batchx3x3xN tensor of gt 1,2 column of orientation matrix
 output:
   loss: Nx6 matrix of SO(3) loss on rotation matrix ?
 """
@@ -26,8 +26,9 @@ def loss_mse_so3(pred, targ):
         targ = targ.unsqueeze(2)
 
     pred = sixD2so3(pred)
+    targ = sixD2so3(targ)
 
-    loss = ((pred - targ).norm(dim=(1,2))**2)
+    loss = (pred - targ).pow(2).squeeze(3)
 
     return loss
 
@@ -35,43 +36,26 @@ def loss_mse_so3(pred, targ):
 def loss_NLL_so3(pred, pred_cov, targ):
 
     if pred.dim() < 3:
-        pred = pred.unsqueeze(0)
-        targ = targ.unsqueeze(0)
+        pred = pred.unsqueeze(2)
+        pred_cov = pred_cov.unsqueeze(2)
+        targ = targ.unsqueeze(2)
 
     pred = sixD2so3(pred)
-    pred_cov = pred_cov.diag()
-    
+    diagonal_matrix = torch.eye(3).unsqueeze(0).unsqueeze(-1).cuda()
+    pred_cov = pred_cov.unsqueeze(2) * diagonal_matrix
+    targ = sixD2so3(targ)
+
+    # Network output isn't 4th tensor
+    pred = pred.squeeze()
+    pred_cov = pred_cov.squeeze()
+    targ = targ.squeeze()
+
     residual = so3_log(pred.bmm(targ.transpose(1,2))).unsqueeze(2)
     
-    weighted_term = 0.5 * residual.transpose(1, 2).bmm(pred_cov).bmm(residual)
-    loss = weighted_term.squeeze() - 0.5 * logdet3(pred_cov)
+    weighted_term = 0.5 * residual.transpose(1,2).bmm(pred_cov).bmm(residual)
+    loss = weighted_term.squeeze() - 0.5 * torch.log((pred_cov[:, 0, 0]*pred_cov[:, 1, 1]*pred_cov[:, 2, 2])**2)
 
     return loss
-
-
-def sixD2so3(sixD):
-    ## two vector of network output
-    a1 = sixD[:, :3, :]  # (1024,6,199)
-    a2 = sixD[:, 3:, :]  # (1024,6,199)
-
-    ## b1 : (1024,1,199)
-    a1_norm = a1.norm(dim=1, keepdim=True)
-    b1 = a1 / a1_norm   # (1024,3,199)
-
-    ## b2
-    b1a2 = torch.einsum('ijk,ijk->ik', b1, a2).unsqueeze(1)
-    b2 = a2 - b1a2 * b1
-    b2_norm = b2.norm(dim=1, keepdim=True)
-    b2 = b2 / b2_norm
-
-    ## b3 (b1, b2 외적)
-    b3 = torch.cross(b1, b2, 1)
-
-    ## rotation matrix : (1024,3,3,199)
-    R = torch.stack((b1, b2, b3), 2)
-
-    return R
-
 
 """
 MSE loss between prediction and target, no logstdariance
@@ -163,7 +147,7 @@ def get_loss(pred, pred_logstd, targ, epoch):
 
 def get_loss_so3(pred, pred_logstd, targ, epoch):
 
-    if epoch < 10:
+    if epoch < 0:
         loss = loss_mse_so3(pred, targ)
     else:
         loss = loss_NLL_so3(pred, pred_logstd, targ)
