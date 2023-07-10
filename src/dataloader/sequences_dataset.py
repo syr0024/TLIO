@@ -266,6 +266,7 @@ class SequencesDataset:
             feats = self.normalize_feats(feats)
         
         ts_us, rot, pos, vel = gt_data
+        R_W_i = Rotation.from_quat(rot).as_matrix()
         targ_dR_World, targ_dt_World = self.poses_to_target(rot, pos)
 
         R_world_gla = np.eye(3)
@@ -296,6 +297,7 @@ class SequencesDataset:
             "main": {
                 "ts_us": ts_us,
                 "feats": feats,
+                "R_W_i": R_W_i,
                 "targ_dR_World": targ_dR_World.astype(np.float32),
                 "targ_dt_World": targ_dt_World.astype(np.float32),
                 "vel_World": vel.astype(np.float32),

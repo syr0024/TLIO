@@ -25,8 +25,10 @@ def loss_mse_so3(pred, targ):
     #     pred = pred.unsqueeze(3)
     #     targ = targ.unsqueeze(3)
 
-    loss = so3_log(pred.transpose(1, 2).bmm(targ).squeeze()).pow(2).squeeze()   # tensor(1024,3)
-    loss = loss.unsqueeze(2).transpose(1, 2).bmm(loss.unsqueeze(2)).squeeze()  # tensor(1024,)
+    loss = (pred - targ).pow(2).squeeze()   # tensor(1024,3,3)
+    # 아래 코드로 하면 pred과 targ 사이의 각도차이가 작아지면서 nan 값이 나와 오류 발생
+    # loss = so3_log(pred.transpose(1, 2).bmm(targ).squeeze()).pow(2).squeeze()   # tensor(1024,3)
+    # loss = loss.unsqueeze(2).transpose(1, 2).bmm(loss.unsqueeze(2)).squeeze()  # tensor(1024,)
 
     return loss
 
@@ -46,12 +48,11 @@ def loss_NLL_so3(pred, pred_cov, targ):
     pred_cov = pred_cov.squeeze()
     targ = targ.squeeze()
 
-    # loss = (pred - targ).transpose() / (2 * torch.exp(2 * pred_cov)) + pred_cov
-
-    residual = so3_log(pred.bmm(targ.transpose(1,2))).unsqueeze(2)
-
-    weighted_term = 0.5 * residual.transpose(1,2).bmm(pred_cov).bmm(residual)
-    loss = weighted_term.squeeze() - 0.5 * torch.log((pred_cov[:, 0, 0]*pred_cov[:, 1, 1]*pred_cov[:, 2, 2])**2)
+    loss = (pred - targ).transpose() / (2 * torch.exp(2 * pred_cov)) + pred_cov
+    # 아래 코드로 하면 pred과 targ 사이의 각도차이가 작아지면서 nan 값이 나와 오류 발생
+    # residual = so3_log(pred.bmm(targ.transpose(1,2))).unsqueeze(2)
+    # weighted_term = 0.5 * residual.transpose(1,2).bmm(pred_cov).bmm(residual)
+    # loss = weighted_term.squeeze() - 0.5 * torch.log((pred_cov[:, 0, 0]*pred_cov[:, 1, 1]*pred_cov[:, 2, 2])**2)
 
     return loss
 
