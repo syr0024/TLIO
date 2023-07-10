@@ -186,6 +186,7 @@ def do_train_R(network, train_loader, device, epoch, optimizer, transforms=[]):
         feat = sample["feats"]["imu0"]
         optimizer.zero_grad()
         pred, pred_cov = network(feat) # pred: (1024, 6) or (1024,6,199)
+        pred = sixD2so3(pred)  # pred: (1024, 3, 3)
 
         if len(pred.shape) == 2:
             targ = sample["targ_dR_World"][:, -1, :, :]  # trag: (1024, 3, 3)
