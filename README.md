@@ -73,7 +73,6 @@ There are three different modes for the network part.`--mode` parameter defines 
 python3 src/main_net.py \
 --mode train \
 --root_dir local_data/tlio_golden \
---out_dir models/resnet \
 --epochs 100
 ```
 
