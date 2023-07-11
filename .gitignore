@@ -1,6 +1,8 @@
 local_data/*
 models/*
 models/resnet/*
+src/models/*
+*.egg-info
 *.txt
 *.zip
 *.mp4
