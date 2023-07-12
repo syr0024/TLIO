@@ -62,7 +62,8 @@ def loss_NLL_so3(pred, pred_cov, targ):
     #     pred = pred.unsqueeze(3)
     #     targ = targ.unsqueeze(3)
 
-    sigma = torch.zeros(1024,3,3).cuda()
+    N = pred_cov.size()
+    sigma = torch.zeros(N[0],3,3).cuda()
     sigma[:, 0, 0] = torch.exp(2*pred_cov[:, 0].squeeze())
     sigma[:, 1, 1] = torch.exp(2*pred_cov[:, 1].squeeze())
     sigma[:, 2, 2] = torch.exp(2*pred_cov[:, 2].squeeze())
