@@ -38,58 +38,51 @@ def loss_mse_so3(pred, targ):
     # loss = loss.unsqueeze(2).transpose(1, 2).bmm(loss.unsqueeze(2)).squeeze()  # tensor(1024,)
 
     ## lietorch
-    # pred = pred.to(torch.float32)
-    # targ = targ.to(torch.float32)
-    targ0 = targ
     pred = SO3.InitFromVec(torch.from_numpy(compute_q_from_matrix(pred.cpu().detach().numpy())).cuda())
     targ = SO3.InitFromVec(torch.from_numpy(compute_q_from_matrix(targ.cpu().detach().numpy())).cuda())
     loss = pred.inv()*targ
     loss = loss.log().unsqueeze(2)
     loss = loss.transpose(1,2).bmm(loss).squeeze()
-    loss.requires_grad = True  # backpropagation을 위함
+    loss.requires_grad = True  # for backpropagation
+    # NaN Debugging
     if torch.any(torch.isnan(loss)):
         nan_ind = torch.nonzero(torch.isnan(loss)).squeeze()
-        print('loss NaN value place: ', nan_ind)
-        print('pred NaN value place: ', pred.data[nan_ind, :])
-        print('targ NaN value place: ', targ.data[nan_ind, :])
-        print('targ0 NaN value place: ', targ0.data[nan_ind, :, :])
+        print('NaN value index of loss: ', nan_ind)
+        print('pred value: ', pred.data[nan_ind, :])
+        print('targ value: ', targ.data[nan_ind, :])
         input()
     return loss
 
 
 def loss_NLL_so3(pred, pred_cov, targ):
 
-    if pred.dim() < 4:
-        pred = pred.unsqueeze(3)
-        pred_cov = pred_cov.unsqueeze(2)
-        targ = targ.unsqueeze(3)
-
     sigma = torch.zeros(1024,3,3).cuda()
     sigma[:, 0, 0] = torch.exp(2*pred_cov[:, 0].squeeze())
     sigma[:, 1, 1] = torch.exp(2*pred_cov[:, 1].squeeze())
     sigma[:, 2, 2] = torch.exp(2*pred_cov[:, 2].squeeze())
-
-    # Network output isn't 4th tensor
-    pred = pred.squeeze()
-    pred_cov = pred_cov.squeeze()
-    targ = targ.squeeze()
 
     ## 기존 displacement loss 계산 방식
     # loss = (pred - targ).pow(2) / (2 * torch.exp(2 * pred_cov)) + pred_cov
 
     ## lie_algebra so3_log 사용: pred과 targ 사이의 각도차이가 작아지면서 nan 값이 나와 오류 발생
     # residual = so3_log(pred.bmm(targ.transpose(1,2))).unsqueeze(2)
-    # weighted_term = 0.5 * residual.transpose(1,2).bmm(pred_cov).bmm(residual)
-    # loss = weighted_term.squeeze() - 0.5 * torch.log((pred_cov[:, 0, 0]*pred_cov[:, 1, 1]*pred_cov[:, 2, 2])**2)
+    # weighted_term = 0.5 * residual.transpose(1,2).bmm(sigma).bmm(residual)
+    # loss = weighted_term.squeeze() + 0.5 * torch.log((sigma[:, 0, 0]*sigma[:, 1, 1]*sigma[:, 2, 2])**2)
 
     ## lietorch
-    pred = pred.float()
-    targ = targ.float()
-    pred = SO3.InitFromVec(compute_q_from_matrix(pred.cpu().numpy())).cuda()
-    targ = SO3.InitFromVec(compute_q_from_matrix(targ.cpu().numpy())).cuda()
+    pred = SO3.InitFromVec(torch.from_numpy(compute_q_from_matrix(pred.cpu().detach().numpy())).cuda().float())
+    targ = SO3.InitFromVec(torch.from_numpy(compute_q_from_matrix(targ.cpu().detach().numpy())).cuda().float())
     loss = pred.inv()*targ
     loss = loss.log().unsqueeze(2)
-    loss = 0.5*(loss.transpose(1,2).bmm(sigma).bmm(loss).squeeze()) + 0.5*(torch.log(sigma[:, 0, 0]*sigma[:, 1, 1]*sigma[:, 2, 2]))
+    loss.requires_grad = True  # for backpropagation
+    loss = 0.5*(loss.transpose(1,2).bmm(sigma.inverse()).bmm(loss).squeeze()) + 0.5*(torch.log(sigma[:, 0, 0]*sigma[:, 1, 1]*sigma[:, 2, 2]))
+    # NaN Debugging
+    if torch.any(torch.isnan(loss)):
+        nan_ind = torch.nonzero(torch.isnan(loss)).squeeze()
+        print('NaN value index of loss: ', nan_ind)
+        print('pred value: ', pred.data[nan_ind, :])
+        print('targ value: ', targ.data[nan_ind, :])
+        input()
 
     return loss
 
@@ -183,7 +176,7 @@ def get_loss(pred, pred_logstd, targ, epoch):
 
 def get_loss_so3(pred, pred_logstd, targ, epoch):
 
-    if epoch < 10:
+    if epoch < 0:
         loss = loss_mse_so3(pred, targ)
     else:
         loss = loss_NLL_so3(pred, pred_logstd, targ)

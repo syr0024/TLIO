@@ -94,6 +94,7 @@ def get_inference_so3(network, data_loader, device, epoch, transforms=[]):
             #targ = so32sixD(targ)  # trag: (1024, 6, 199)
 
         loss = get_loss_so3(pred, pred_cov, targ, epoch)
+        # loss = loss_mse_so3(pred, pred_cov, targ, epoch) # dR 학습하는 경우 사용
 
         targets_all.append(torch_to_numpy(targ))
         preds_all.append(torch_to_numpy(pred))
@@ -206,11 +207,12 @@ def do_train_R(network, train_loader, device, epoch, optimizer, transforms=[]):
 
         loss = loss.mean()
         loss.backward()
-        print("bid: ", bid)
-        print("pred: ", torch.any(torch.isfinite(pred)))
-        print("pred: ", pred.mean())
-        print("loss: ", loss)
+        # NaN debugging
         if torch.any(torch.isnan(pred)) or torch.any(torch.isnan(loss)):
+            print("bid: ", bid)
+            print("pred: ", torch.any(torch.isfinite(pred)))
+            print("pred: ", pred.mean())
+            print("loss: ", loss)
             input('stop: ')
         torch.nn.utils.clip_grad_norm_(network.parameters(), 0.1, error_if_nonfinite=True)
         optimizer.step()
@@ -229,7 +231,8 @@ def do_train_R(network, train_loader, device, epoch, optimizer, transforms=[]):
 
 def do_train_dR(network, train_loader, device, epoch, optimizer, transforms=[]):
     """
-    rotation matrix의 차이를 계산하는 network, 이 네트워크를 사용하기 위해서는 net_train에서 do_train 부분을 do_train_dR로 바꿔주면 됨.
+    rotation matrix의 차이를 계산하는 network, 이 네트워크를 사용하기 위해서는 net_train에서 do_train 부분을 do_train_dR로 바꿔주고
+    get_inference_so3 get_loss 부분을 loss_mse_so3로 바꿔주기.
     Train network for one epoch using a specified data loader
     Outputs all targets, predicts, predicted covariance params, and losses in numpy arrays
     """
@@ -542,7 +545,7 @@ def net_train(args):
 
         logging.info(f"-------------- Training, Epoch {epoch} ---------------")
         start_t = time.time()
-        train_attr_dict = do_train_dR(network, train_loader, device, epoch, optimizer, train_transforms)
+        train_attr_dict = do_train_R(network, train_loader, device, epoch, optimizer, train_transforms)
         write_summary(summary_writer, train_attr_dict, epoch, optimizer, "train")
         end_t = time.time()
         logging.info(f"time usage: {end_t - start_t:.3f}s")
