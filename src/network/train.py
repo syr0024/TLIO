@@ -94,7 +94,7 @@ def get_inference_so3(network, data_loader, device, epoch, transforms=[]):
             #targ = so32sixD(targ)  # trag: (1024, 6, 199)
 
         loss = get_loss_so3(pred, pred_cov, targ, epoch)
-        # loss = loss_mse_so3(pred, pred_cov, targ, epoch) # dR 학습하는 경우 사용
+        # loss = loss_mse_so3(pred, targ) # dR 학습하는 경우 사용
 
         targets_all.append(torch_to_numpy(targ))
         preds_all.append(torch_to_numpy(pred))

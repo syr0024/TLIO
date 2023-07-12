@@ -25,7 +25,7 @@ def loss_L2dis_so3(pred, targ):
 
 def loss_mse_so3(pred, targ):
 
-    # pres, targ is torch.tensor
+    # pred, targ is torch.tensor
     # if pred.dim() < 4:
     #     pred = pred.unsqueeze(3)
     #     targ = targ.unsqueeze(3)
@@ -44,6 +44,7 @@ def loss_mse_so3(pred, targ):
     loss = loss.log().unsqueeze(2)
     loss = loss.transpose(1,2).bmm(loss).squeeze()
     loss.requires_grad = True  # for backpropagation
+
     # NaN Debugging
     if torch.any(torch.isnan(loss)):
         nan_ind = torch.nonzero(torch.isnan(loss)).squeeze()
@@ -55,6 +56,11 @@ def loss_mse_so3(pred, targ):
 
 
 def loss_NLL_so3(pred, pred_cov, targ):
+
+    # pred, targ is torch.tensor
+    # if pred.dim() < 4:
+    #     pred = pred.unsqueeze(3)
+    #     targ = targ.unsqueeze(3)
 
     sigma = torch.zeros(1024,3,3).cuda()
     sigma[:, 0, 0] = torch.exp(2*pred_cov[:, 0].squeeze())
@@ -76,6 +82,7 @@ def loss_NLL_so3(pred, pred_cov, targ):
     loss = loss.log().unsqueeze(2)
     loss.requires_grad = True  # for backpropagation
     loss = 0.5*(loss.transpose(1,2).bmm(sigma.inverse()).bmm(loss).squeeze()) + 0.5*(torch.log(sigma[:, 0, 0]*sigma[:, 1, 1]*sigma[:, 2, 2]))
+
     # NaN Debugging
     if torch.any(torch.isnan(loss)):
         nan_ind = torch.nonzero(torch.isnan(loss)).squeeze()
