@@ -206,8 +206,13 @@ def do_train_R(network, train_loader, device, epoch, optimizer, transforms=[]):
 
         loss = loss.mean()
         loss.backward()
-        #print("bid: ",bid)
-        torch.nn.utils.clip_grad_norm_(network.parameters(), 3.0, error_if_nonfinite=True)
+        print("bid: ", bid)
+        print("pred: ", torch.any(torch.isfinite(pred)))
+        print("pred: ", pred.mean())
+        print("loss: ", loss)
+        if torch.any(torch.isnan(pred)) or torch.any(torch.isnan(loss)):
+            input('stop: ')
+        torch.nn.utils.clip_grad_norm_(network.parameters(), 0.1, error_if_nonfinite=True)
         optimizer.step()
 
     train_targets = np.concatenate(train_targets, axis=0)

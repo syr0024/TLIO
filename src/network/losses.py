@@ -4,25 +4,9 @@ from network.covariance_parametrization import DiagonalParam
 from lietorch import SO3, LieGroupParameter
 from utils.lie_algebra import so3_log
 from utils.from_scipy import compute_q_from_matrix
-from torch.nn.functional import normalize
 from utils.math_utils import logdet3, sixD2so3, so32sixD
 
 MIN_LOG_STD = np.log(1e-3)
-
-def rot2quat(rotation_matrix):
-    N = rotation_matrix.size(0)  # N의 값
-    assert rotation_matrix.size() == (N, 3, 3), "Invalid rotation matrix size"
-
-    rotation_matrix = normalize(rotation_matrix, dim=2)  # 회전 행렬 정규화
-
-    qw = 0.5 * torch.sqrt(1 + rotation_matrix[:, 0, 0] + rotation_matrix[:, 1, 1] + rotation_matrix[:, 2, 2])
-    qx = (rotation_matrix[:, 2, 1] - rotation_matrix[:, 1, 2]) / (4 * qw)
-    qy = (rotation_matrix[:, 0, 2] - rotation_matrix[:, 2, 0]) / (4 * qw)
-    qz = (rotation_matrix[:, 1, 0] - rotation_matrix[:, 0, 1]) / (4 * qw)
-
-    quaternion = torch.stack((qw, qx, qy, qz), dim=1)
-
-    return quaternion
 
 """
 SO(3) loss
@@ -53,14 +37,23 @@ def loss_mse_so3(pred, targ):
     # loss = so3_log(pred.transpose(1, 2).bmm(targ).squeeze()).pow(2).squeeze()   # tensor(1024,3)
     # loss = loss.unsqueeze(2).transpose(1, 2).bmm(loss.unsqueeze(2)).squeeze()  # tensor(1024,)
 
-    pred = pred.float()
-    targ = targ.float()
-    pred = SO3.InitFromVec(rot2quat(pred))
-    targ = SO3.InitFromVec(rot2quat(targ))
+    ## lietorch
+    # pred = pred.to(torch.float32)
+    # targ = targ.to(torch.float32)
+    targ0 = targ
+    pred = SO3.InitFromVec(torch.from_numpy(compute_q_from_matrix(pred.cpu().detach().numpy())).cuda())
+    targ = SO3.InitFromVec(torch.from_numpy(compute_q_from_matrix(targ.cpu().detach().numpy())).cuda())
     loss = pred.inv()*targ
     loss = loss.log().unsqueeze(2)
     loss = loss.transpose(1,2).bmm(loss).squeeze()
-
+    loss.requires_grad = True  # backpropagation을 위함
+    if torch.any(torch.isnan(loss)):
+        nan_ind = torch.nonzero(torch.isnan(loss)).squeeze()
+        print('loss NaN value place: ', nan_ind)
+        print('pred NaN value place: ', pred.data[nan_ind, :])
+        print('targ NaN value place: ', targ.data[nan_ind, :])
+        print('targ0 NaN value place: ', targ0.data[nan_ind, :, :])
+        input()
     return loss
 
 
@@ -92,8 +85,8 @@ def loss_NLL_so3(pred, pred_cov, targ):
     ## lietorch
     pred = pred.float()
     targ = targ.float()
-    pred = SO3.InitFromVec(rot2quat(pred))
-    targ = SO3.InitFromVec(rot2quat(targ))
+    pred = SO3.InitFromVec(compute_q_from_matrix(pred.cpu().numpy())).cuda()
+    targ = SO3.InitFromVec(compute_q_from_matrix(targ.cpu().numpy())).cuda()
     loss = pred.inv()*targ
     loss = loss.log().unsqueeze(2)
     loss = 0.5*(loss.transpose(1,2).bmm(sigma).bmm(loss).squeeze()) + 0.5*(torch.log(sigma[:, 0, 0]*sigma[:, 1, 1]*sigma[:, 2, 2]))
