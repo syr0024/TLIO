@@ -4,9 +4,25 @@ from network.covariance_parametrization import DiagonalParam
 from lietorch import SO3, LieGroupParameter
 from utils.lie_algebra import so3_log
 from utils.from_scipy import compute_q_from_matrix
+from torch.nn.functional import normalize
 from utils.math_utils import logdet3, sixD2so3, so32sixD
 
 MIN_LOG_STD = np.log(1e-3)
+
+def rot2quat(rotation_matrix):
+    N = rotation_matrix.size(0)  # N의 값
+    assert rotation_matrix.size() == (N, 3, 3), "Invalid rotation matrix size"
+
+    rotation_matrix = normalize(rotation_matrix, dim=2)  # 회전 행렬 정규화
+
+    qw = 0.5 * torch.sqrt(1 + rotation_matrix[:, 0, 0] + rotation_matrix[:, 1, 1] + rotation_matrix[:, 2, 2])
+    qx = (rotation_matrix[:, 2, 1] - rotation_matrix[:, 1, 2]) / (4 * qw)
+    qy = (rotation_matrix[:, 0, 2] - rotation_matrix[:, 2, 0]) / (4 * qw)
+    qz = (rotation_matrix[:, 1, 0] - rotation_matrix[:, 0, 1]) / (4 * qw)
+
+    quaternion = torch.stack((qw, qx, qy, qz), dim=1)
+
+    return quaternion
 
 """
 SO(3) loss
@@ -37,25 +53,13 @@ def loss_mse_so3(pred, targ):
     # loss = so3_log(pred.transpose(1, 2).bmm(targ).squeeze()).pow(2).squeeze()   # tensor(1024,3)
     # loss = loss.unsqueeze(2).transpose(1, 2).bmm(loss.unsqueeze(2)).squeeze()  # tensor(1024,)
 
-    ## lietorch: log를 계산할 때 batch의 크기가 768을 넘어가면 768번째부터 nan이 생겨서 분할해줌
-    if pred.size()[0] > 767:
-        n = int(pred.size()[0] / 2)
-        M1 = SO3(pred[:n,:,:].transpose(1,2).bmm(targ[:n,:,:]))
-        M2 = SO3(pred[n:,:,:].transpose(1,2).bmm(targ[n:,:,:]))
-        M = torch.cat((M1.log(), M2.log()), dim=0).norm(dim=-1).unsqueeze(2)
-    else:
-        M = SO3(pred.transpose(1,2).bmm(targ))
-        M = M.log().norm(dim=-1).unsqueeze(2)
-
+    pred = pred.float()
+    targ = targ.float()
+    pred = SO3.InitFromVec(rot2quat(pred))
+    targ = SO3.InitFromVec(rot2quat(targ))
+    loss = pred.inv()*targ
+    loss = loss.log().unsqueeze(2)
     loss = loss.transpose(1,2).bmm(loss).squeeze()
-
-    # # nan 디버깅:
-    # indices = torch.isnan(loss).nonzero()
-    # first_nan_index = indices[0]
-    #
-    # print("처음으로 NaN이 나타나는 인덱스:", first_nan_index)
-    # print(loss[first_nan_index[0]-1,:,:])
-    # print(M.data[first_nan_index[0],:,:])
 
     return loss
 
@@ -67,8 +71,10 @@ def loss_NLL_so3(pred, pred_cov, targ):
         pred_cov = pred_cov.unsqueeze(2)
         targ = targ.unsqueeze(3)
 
-    diagonal_matrix = torch.eye(3).unsqueeze(0).unsqueeze(-1).cuda()
-    pred_cov = pred_cov.unsqueeze(2) * diagonal_matrix
+    sigma = torch.zeros(1024,3,3).cuda()
+    sigma[:, 0, 0] = torch.exp(2*pred_cov[:, 0].squeeze())
+    sigma[:, 1, 1] = torch.exp(2*pred_cov[:, 1].squeeze())
+    sigma[:, 2, 2] = torch.exp(2*pred_cov[:, 2].squeeze())
 
     # Network output isn't 4th tensor
     pred = pred.squeeze()
@@ -84,16 +90,13 @@ def loss_NLL_so3(pred, pred_cov, targ):
     # loss = weighted_term.squeeze() - 0.5 * torch.log((pred_cov[:, 0, 0]*pred_cov[:, 1, 1]*pred_cov[:, 2, 2])**2)
 
     ## lietorch
-    if pred.size()[0] > 767:
-        n = int(pred.size()[0] / 2)
-        M1 = SO3(pred[:n,:,:].transpose(1,2).bmm(targ[:n,:,:]))
-        M2 = SO3(pred[n:,:,:].transpose(1,2).bmm(targ[n:,:,:]))
-        M = torch.cat((M1.log(), M2.log()), dim=0).norm(dim=-1).unsqueeze(2)
-    else:
-        M = SO3(pred.transpose(1,2).bmm(targ))
-        M = M.log().norm(dim=-1).unsqueeze(2)
-
-    loss = 0.5*M.transpose(1,2).bmm(pred_cov).bmm(M).squeeze() - 0.5*torch.log((pred_cov[:, 0, 0]*pred_cov[:, 1, 1]*pred_cov[:, 2, 2])**2)
+    pred = pred.float()
+    targ = targ.float()
+    pred = SO3.InitFromVec(rot2quat(pred))
+    targ = SO3.InitFromVec(rot2quat(targ))
+    loss = pred.inv()*targ
+    loss = loss.log().unsqueeze(2)
+    loss = 0.5*(loss.transpose(1,2).bmm(sigma).bmm(loss).squeeze()) + 0.5*(torch.log(sigma[:, 0, 0]*sigma[:, 1, 1]*sigma[:, 2, 2]))
 
     return loss
 
@@ -187,7 +190,7 @@ def get_loss(pred, pred_logstd, targ, epoch):
 
 def get_loss_so3(pred, pred_logstd, targ, epoch):
 
-    if epoch < 0:
+    if epoch < 10:
         loss = loss_mse_so3(pred, targ)
     else:
         loss = loss_NLL_so3(pred, pred_logstd, targ)

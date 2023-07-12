@@ -14,7 +14,7 @@ import numpy as np
 import torch
 # from dataloader.dataset_fb import FbSequenceDataset
 from dataloader.tlio_data import TlioData
-from network.losses import get_loss, get_loss_so3
+from network.losses import get_loss, get_loss_so3, loss_mse_so3
 from network.model_factory import get_model
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
@@ -115,6 +115,7 @@ def get_inference_so3(network, data_loader, device, epoch, transforms=[]):
 
 def do_train(network, train_loader, device, epoch, optimizer, transforms=[]):
     """
+    displacement를 계산하는 TLIO 의 기존 network
     Train network for one epoch using a specified data loader
     Outputs all targets, predicts, predicted covariance params, and losses in numpy arrays
     """
@@ -173,6 +174,57 @@ def do_train(network, train_loader, device, epoch, optimizer, transforms=[]):
 
 def do_train_R(network, train_loader, device, epoch, optimizer, transforms=[]):
     """
+    rotation matrix를 계산하는 network, 이 네트워크를 사용하기 위해서는 net_train에서 do_train 부분을 do_train_R로 바꿔주면 됨.
+    Train network for one epoch using a specified data loader
+    Outputs all targets, predicts, predicted covariance params, and losses in numpy arrays
+    """
+    train_targets, train_preds, train_preds_cov, train_losses = [], [], [], []
+    network.train()
+
+    # for bid, (feat, targ, _, _) in enumerate(train_loader):
+    for bid, sample in enumerate(train_loader):
+        sample = to_device(sample, device)
+        for transform in transforms:
+            sample = transform(sample)
+        feat = sample["feats"]["imu0"]
+        optimizer.zero_grad()
+        pred, pred_cov = network(feat) # pred: (1024, 6) or (1024,6,199)  # nan 발생 지정
+        pred = sixD2so3(pred.unsqueeze(2)).squeeze()  # pred: (1024, 3, 3)
+
+        if len(pred.shape) == 3:
+            targ = sample["R_W_i"][:, -1, :, :]  # trag: (1024, 3, 3)
+        else:
+        # Leave off zeroth element since it's 0's. Ex: Net predicts 199 if there's 200 GT
+            targ = sample["R_W_i"][:, 1:, :, :].permute(0, 2, 3, 1) # trag: (1024, 3, 3, 199)
+
+        loss = get_loss_so3(pred, pred_cov, targ, epoch)
+
+        train_targets.append(torch_to_numpy(targ))
+        train_preds.append(torch_to_numpy(pred))
+        train_preds_cov.append(torch_to_numpy(pred_cov))
+        train_losses.append(torch_to_numpy(loss))
+
+        loss = loss.mean()
+        loss.backward()
+        #print("bid: ",bid)
+        torch.nn.utils.clip_grad_norm_(network.parameters(), 3.0, error_if_nonfinite=True)
+        optimizer.step()
+
+    train_targets = np.concatenate(train_targets, axis=0)
+    train_preds = np.concatenate(train_preds, axis=0)
+    train_preds_cov = np.concatenate(train_preds_cov, axis=0)
+    train_losses = np.concatenate(train_losses, axis=0)
+    train_attr_dict = {
+        "targets": train_targets,
+        "preds": train_preds,
+        "preds_cov": train_preds_cov,
+        "losses": train_losses,
+    }
+    return train_attr_dict
+
+def do_train_dR(network, train_loader, device, epoch, optimizer, transforms=[]):
+    """
+    rotation matrix의 차이를 계산하는 network, 이 네트워크를 사용하기 위해서는 net_train에서 do_train 부분을 do_train_dR로 바꿔주면 됨.
     Train network for one epoch using a specified data loader
     Outputs all targets, predicts, predicted covariance params, and losses in numpy arrays
     """
@@ -193,11 +245,12 @@ def do_train_R(network, train_loader, device, epoch, optimizer, transforms=[]):
             targ = sample["targ_dR_World"][:, -1, :, :]  # trag: (1024, 3, 3)
             #targ = so32sixD(targ)  # trag: (1024, 6)
         else:
-        # Leave off zeroth element since it's 0's. Ex: Net predicts 199 if there's 200 GT
+            # Leave off zeroth element since it's 0's. Ex: Net predicts 199 if there's 200 GT
             targ = sample["targ_dR_World"][:, 1:, :, :].permute(0, 2, 3, 1) # trag: (1024, 3, 3, 199)
             #targ = so32sixD(targ)  # trag: (1024, 6, 199)
 
-        loss = get_loss_so3(pred, pred_cov, targ, epoch)
+        loss = loss_mse_so3(pred, targ)
+        # loss = get_loss_so3(pred, pred_cov, targ, epoch)
 
         train_targets.append(torch_to_numpy(targ))
         train_preds.append(torch_to_numpy(pred))
@@ -207,7 +260,7 @@ def do_train_R(network, train_loader, device, epoch, optimizer, transforms=[]):
         loss = loss.mean()
         loss.backward()
 
-        torch.nn.utils.clip_grad_norm_(network.parameters(), 0.1, error_if_nonfinite=False)
+        torch.nn.utils.clip_grad_norm_(network.parameters(), 0.1, error_if_nonfinite=True)
         optimizer.step()
 
     train_targets = np.concatenate(train_targets, axis=0)
@@ -239,10 +292,10 @@ def write_summary(summary_writer, attr_dict, epoch, optimizer, mode):
     #     sigmas = sigmas[:, :, -1]
     summary_writer.add_scalar(f"{mode}_loss/avg", np.mean(mse_loss), epoch)
     summary_writer.add_scalar(f"{mode}_dist/loss_full", ml_loss, epoch)
-    summary_writer.add_histogram(f"{mode}_hist/sigma_x", sigmas[:, 0], epoch)
-    summary_writer.add_histogram(f"{mode}_hist/sigma_y", sigmas[:, 1], epoch)
-    summary_writer.add_histogram(f"{mode}_hist/sigma_z", sigmas[:, 2], epoch)
-    summary_writer.add_histogram(f"{mode}_hist/sigma_z", np.mean(sigmas), epoch)
+    summary_writer.add_scalar(f"{mode}_dist/sigma_x", np.mean(sigmas[:, 0]), epoch)
+    summary_writer.add_scalar(f"{mode}_dist/sigma_y", np.mean(sigmas[:, 1]), epoch)
+    summary_writer.add_scalar(f"{mode}_dist/sigma_z", np.mean(sigmas[:, 2]), epoch)
+    summary_writer.add_scalar(f"{mode}_dist/sigma_avg", np.mean(sigmas), epoch)
     if epoch > 0:
         summary_writer.add_scalar(
             "optimizer/lr", optimizer.param_groups[0]["lr"], epoch - 1
@@ -484,16 +537,10 @@ def net_train(args):
 
         logging.info(f"-------------- Training, Epoch {epoch} ---------------")
         start_t = time.time()
-        train_attr_dict = do_train_R(network, train_loader, device, epoch, optimizer, train_transforms)
+        train_attr_dict = do_train_dR(network, train_loader, device, epoch, optimizer, train_transforms)
         write_summary(summary_writer, train_attr_dict, epoch, optimizer, "train")
         end_t = time.time()
         logging.info(f"time usage: {end_t - start_t:.3f}s")
-
-        # start_t = time.time()
-        # train_attr_dict = do_train_R(network_R, train_loader, device, epoch, optimizer, train_transforms)
-        # write_summary(summary_writer, train_attr_dict, epoch, optimizer, "train")
-        # end_t = time.time()
-        # logging.info(f"time usage for orientation network: {end_t - start_t:.3f}s")
 
         if val_loader is not None:
             val_attr_dict = get_inference_so3(network, val_loader, device, epoch)

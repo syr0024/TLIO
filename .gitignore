@@ -2,11 +2,13 @@ local_data/*
 models/*
 models/resnet/*
 src/models/*
+lietorch/*
+src/network/__pycache__/*
 *.egg-info
 *.txt
 *.zip
 *.mp4
 *.avi
 *.wmv
-*.pyc
+*.cpython-39.pyc
 *.pt
