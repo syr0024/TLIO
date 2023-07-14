@@ -193,9 +193,17 @@ def do_train_R(network, train_loader, device, epoch, optimizer, transforms=[]):
         for transform in transforms:
             sample = transform(sample)
         # way1) input size: (1024, 6+9, 200)
-        R_W_0 = sample["R_W_i"][:, 0, :, :]
-        R_W_0 = R_W_0.flatten(start_dim = 1).unsqueeze(2).repeat(1, 1, 200)
-        feat = torch.cat((sample["feats"]["imu0"], R_W_0), axis = 1).float()
+        # R_W_0 = sample["R_W_i"][:, 0, :, :]
+        # R_W_0 = R_W_0.flatten(start_dim = 1).unsqueeze(2).repeat(1, 1, 200)
+        # feat = torch.cat((sample["feats"]["imu0"], R_W_0), axis = 1).float()
+
+        if(bid==0):
+            R_W_0 = sample["R_W_i"][:, 0, :, :].flatten(1)
+        else:
+            R_W_0 = pred.flatten(1)
+
+        # R_W_0 = R_W_0.flatten(start_dim = 1).unsqueeze(2).repeat(1, 1, 10)
+        feat = torch.cat((sample["feats"]["imu0"].flatten(1), R_W_0), axis = 1).unsqueeze(2).float()
         #
         optimizer.zero_grad()
         pred, pred_cov = network(feat) # pred: (1024, 6) 점or (1024,6,199)  # nan 발생 지
