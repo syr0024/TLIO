@@ -89,7 +89,7 @@ def so3_log(R):
     # If angle is close to zero, use first-order Taylor expansion
     small_angles_mask = isclose(angles, 0.).squeeze()
     small_angles_num = small_angles_mask.sum().item()
-    pi_angles_mask = (np.pi - angles).lt(1e-5).view(-1)
+    pi_angles_mask = (np.pi - angles).lt(1e-7).view(-1)
 
 
     #This tensor is used to extract the 3x3 R's that correspond to small angles
@@ -144,6 +144,16 @@ def so3_log(R):
             print(logs[pi_angles_indices[i]-1,:])
             print("pi_angles_log: ", logs[pi_angles_indices[i],:])
             print(logs[pi_angles_indices[i]+1,:])
+
+    ## logarithm 해준 값들 중 pi 보다 큰 값이 있는지 확인
+    log_mask = logs>np.pi
+    if torch.any(torch.any(log_mask, dim=1)):
+        print('theta close to pi angle index: ', torch.nonzero(torch.any(log_mask, dim=1)))
+        print('R: ', R[torch.any(log_mask, dim=1), :, :])
+        print('angles: ', angles[torch.any(log_mask, dim=1), :])
+        print('sin_angles: ', sin_angles[torch.any(log_mask, dim=1), :])
+        print('logs: ', logs[torch.any(log_mask, dim=1), :])
+        #print('Warning - theta close to pi - may get erroneous SO3() logs!')
 
     # if pi_angles_mask.any():
     #     I = R.new(3, 3).zero_()
