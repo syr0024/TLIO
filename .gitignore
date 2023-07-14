@@ -2,8 +2,8 @@ local_data/*
 models/*
 models/resnet/*
 src/models/*
-lietorch/*
-src/network/__pycache__/*
+lietorch/
+src/network/__pycache__/
 *.egg-info
 *.txt
 *.zip

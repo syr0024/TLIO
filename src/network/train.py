@@ -187,9 +187,11 @@ def do_train_R(network, train_loader, device, epoch, optimizer, transforms=[]):
         sample = to_device(sample, device)
         for transform in transforms:
             sample = transform(sample)
-        feat = sample["feats"]["imu0"]
+        R_W_0 = sample["R_W_i"][:, 0, :, :]
+        R_W_0 = R_W_0.flatten(start_dim = 1).unsqueeze(2).repeat(1, 1, 200)
+        feat = torch.cat((sample["feats"]["imu0"], R_W_0), axis = 1).float()
         optimizer.zero_grad()
-        pred, pred_cov = network(feat) # pred: (1024, 6) or (1024,6,199)  # nan 발생 지정
+        pred, pred_cov = network(feat) # pred: (1024, 6) 점or (1024,6,199)  # nan 발생 지
         pred = sixD2so3(pred.unsqueeze(2)).squeeze()  # pred: (1024, 3, 3)
 
         if len(pred.shape) == 3:
@@ -307,7 +309,7 @@ def write_summary(summary_writer, attr_dict, epoch, optimizer, mode):
     #     sigmas = sigmas[:, :, -1]
     summary_writer.add_scalar(f"{mode}_loss/mse_loss_avg", np.mean(mse_loss), epoch)
     summary_writer.add_scalar(f"{mode}_loss/mse_so3_loss_avg", np.mean(mse_so3_loss), epoch)
-    summary_writer.add_scalar(f"{mode}_loss/nll_loss_full", ml_loss, epoch)
+    summary_writer.add_scalar(f"{mode}_loss/loss_full", ml_loss, epoch)
     summary_writer.add_scalar(f"{mode}_dist/sigma_x", np.mean(sigmas[:, 0]), epoch)
     summary_writer.add_scalar(f"{mode}_dist/sigma_y", np.mean(sigmas[:, 1]), epoch)
     summary_writer.add_scalar(f"{mode}_dist/sigma_z", np.mean(sigmas[:, 2]), epoch)
@@ -317,7 +319,7 @@ def write_summary(summary_writer, attr_dict, epoch, optimizer, mode):
             "optimizer/lr", optimizer.param_groups[0]["lr"], epoch - 1
         )
     logging.info(
-        f"{mode}: average ml loss: {ml_loss}, average mse loss: {mse_loss}/{np.mean(mse_loss)}"
+        f"{mode}: average ml loss: {ml_loss}, average mse loss: {np.mean(mse_loss)}, average mse so3 loss: {mse_so3_loss}"
     )
 
 

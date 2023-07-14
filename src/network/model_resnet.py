@@ -154,7 +154,7 @@ class FcBlock(nn.Module):
 class ResNet1D(nn.Module):
     """
     ResNet 1D
-    in_dim: input channel (for IMU data, in_dim=6)
+    in_dim: input channel (for IMU data, Rotation matrix, in_dim=6+9=15)
     out_dim: output dimension (3)
     len(group_sizes) = 4
     """
