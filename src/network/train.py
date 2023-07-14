@@ -204,13 +204,19 @@ def do_train_R(network, train_loader, device, epoch, optimizer, transforms=[]):
         train_preds.append(torch_to_numpy(pred))
         train_preds_cov.append(torch_to_numpy(pred_cov))
         train_losses.append(torch_to_numpy(loss))
+        print("bid: ", bid)
+        if torch.any(torch.isnan(loss)):
+            print("loss is finite: ", torch.any(torch.isfinite(loss)))
 
         loss = loss.mean()
         loss.backward()
+        if torch.any(torch.isnan(loss)):
+            print("pred is finite: ", torch.any(torch.isfinite(pred)))
+            print("pred: ", pred.mean())
+            print("loss: ", loss)
         # NaN debugging
-        if torch.any(torch.isnan(pred)) or torch.any(torch.isnan(loss)):
-            print("bid: ", bid)
-            print("pred: ", torch.any(torch.isfinite(pred)))
+        if torch.any(torch.isnan(pred)):
+            print("pred is finite: ", torch.any(torch.isfinite(pred)))
             print("pred: ", pred.mean())
             print("loss: ", loss)
             input('stop: ')
@@ -287,6 +293,7 @@ def write_summary(summary_writer, attr_dict, epoch, optimizer, mode):
     """ Given the attr_dict write summary and log the losses """
 
     mse_loss = np.mean((attr_dict["targets"] - attr_dict["preds"]) ** 2, axis=0)  #shape (3,3)
+    # mse_so3_loss = np.mean(loss_mse_so3(attr_dict["preds"], attr_dict["targets"]))   #pred와 targ각도차
     ml_loss = np.average(attr_dict["losses"])  #shape (1)
     sigmas = np.exp(attr_dict["preds_cov"])  #shape (3,3)
     # print("mse_loss size: ", mse_loss.shape)
@@ -298,8 +305,9 @@ def write_summary(summary_writer, attr_dict, epoch, optimizer, mode):
     #     mse_loss = mse_loss[:, -1]
     #     assert sigmas.shape[1] == 3
     #     sigmas = sigmas[:, :, -1]
-    summary_writer.add_scalar(f"{mode}_loss/avg", np.mean(mse_loss), epoch)
-    summary_writer.add_scalar(f"{mode}_dist/loss_full", ml_loss, epoch)
+    summary_writer.add_scalar(f"{mode}_loss/mse_loss_avg", np.mean(mse_loss), epoch)
+    # summary_writer.add_scalar(f"{mode}_loss/mse_so3_loss_avg", np.mean(mse_so3_loss), epoch)
+    summary_writer.add_scalar(f"{mode}_loss/nll_loss_full", ml_loss, epoch)
     summary_writer.add_scalar(f"{mode}_dist/sigma_x", np.mean(sigmas[:, 0]), epoch)
     summary_writer.add_scalar(f"{mode}_dist/sigma_y", np.mean(sigmas[:, 1]), epoch)
     summary_writer.add_scalar(f"{mode}_dist/sigma_z", np.mean(sigmas[:, 2]), epoch)

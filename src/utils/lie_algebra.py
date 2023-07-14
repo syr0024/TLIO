@@ -74,6 +74,13 @@ def so3_log(R):
 
     # The cosine of the rotation angle is related to the trace of C
     #NOTE: clamp ensures that we don't get any nan's due to out of range numerical errors
+
+    ## clamp 되는거 있는지 확인하는 코드
+    # if torch.any(batch_trace(R)>3) or torch.any(batch_trace(R)<-1):
+    #     print('[so3_log]')
+    #     print('larger than 3: ', torch.count_nonzero(batch_trace(R)>3))
+    #     print('smaller than -1: ', torch.count_nonzero(batch_trace(R)<-1))
+
     angles = torch.acos((0.5 * batch_trace(R) - 0.5).clamp(-1., 1.))
     sin_angles = torch.sin(angles)
     
@@ -83,8 +90,6 @@ def so3_log(R):
     small_angles_mask = isclose(angles, 0.).squeeze()
     small_angles_num = small_angles_mask.sum().item()
     pi_angles_mask = (np.pi - angles).lt(1e-5).view(-1)
-    if pi_angles_mask.any():
-       print('Warning - theta close to pi - may get erroneous SO3() logs!')
 
 
     #This tensor is used to extract the 3x3 R's that correspond to small angles
@@ -117,6 +122,28 @@ def so3_log(R):
         small_logs = so3_vee(R[small_angles_indices] - I)
         logs[small_angles_indices] = small_logs
 
+    ## angle이 pi에 가까워지는 값이 있을 때 log 값이 무한대로 발산하지 않도록 다른 수식 사용
+    if pi_angles_mask.any():
+        # print('theta close to pi angle index: ', torch.nonzero(pi_angles_mask))
+        # print('R: ', R[pi_angles_mask, :, :])
+        # print('angles: ', angles[pi_angles_mask, :])
+        # print('sin_angles: ', sin_angles[pi_angles_mask, :])
+        print('Warning - theta close to pi - may get erroneous SO3() logs!')
+        pi_angles_indices = pi_angles_mask.nonzero().squeeze(1)
+        I = R.new(3, 3).zero_()
+        I[0,0] = I[1,1] = I[2,2] = 1.0
+        for i in range(pi_angles_indices.size(0)):
+            pi_angles_R = R[pi_angles_indices[i],: ,:].squeeze()
+            S = torch.sign(torch.tensor((pi_angles_R[0,1], pi_angles_R[0,2], pi_angles_R[1,2])))
+            sign = torch.tensor((1, S[0], S[1]))
+
+            logs[pi_angles_indices[i],:] = torch.tensor(((sign[0]*(0.5*(1+pi_angles_R[0,0]))**0.5)*np.pi,
+                                                         (sign[1]*(0.5*(1+pi_angles_R[1,1]))**0.5)*np.pi,
+                                                         (sign[2]*(0.5*(1+pi_angles_R[2,2]))**0.5)*np.pi))
+            print(pi_angles_R)
+            print(logs[pi_angles_indices[i]-1,:])
+            print("pi_angles_log: ", logs[pi_angles_indices[i],:])
+            print(logs[pi_angles_indices[i]+1,:])
 
     # if pi_angles_mask.any():
     #     I = R.new(3, 3).zero_()
