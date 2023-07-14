@@ -213,7 +213,7 @@ def do_train_R(network, train_loader, device, epoch, optimizer, transforms=[]):
         train_preds.append(torch_to_numpy(pred))
         train_preds_cov.append(torch_to_numpy(pred_cov))
         train_losses.append(torch_to_numpy(loss))
-        print("bid: ", bid)
+        # print("bid: ", bid)
         if torch.any(torch.isnan(loss)):
             print("loss is finite: ", torch.any(torch.isfinite(loss)))
 
