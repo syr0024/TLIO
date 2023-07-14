@@ -81,7 +81,12 @@ def get_inference_so3(network, data_loader, device, epoch, transforms=[]):
         sample = to_device(sample, device)
         for transform in transforms:
             sample = transform(sample)
-        feat = sample["feats"]["imu0"]
+        # feat = sample["feats"]["imu0"]
+        # way1) input size: (1024, 6+9, 200)
+        R_W_0 = sample["R_W_i"][:, 0, :, :]
+        R_W_0 = R_W_0.flatten(start_dim = 1).unsqueeze(2).repeat(1, 1, 200)
+        feat = torch.cat((sample["feats"]["imu0"], R_W_0), axis = 1).float()
+        #
         pred, pred_cov = network(feat)
         pred = sixD2so3(pred.unsqueeze(2)).squeeze()  # pred: (1024, 3, 3)
 
@@ -191,6 +196,7 @@ def do_train_R(network, train_loader, device, epoch, optimizer, transforms=[]):
         R_W_0 = sample["R_W_i"][:, 0, :, :]
         R_W_0 = R_W_0.flatten(start_dim = 1).unsqueeze(2).repeat(1, 1, 200)
         feat = torch.cat((sample["feats"]["imu0"], R_W_0), axis = 1).float()
+        #
         optimizer.zero_grad()
         pred, pred_cov = network(feat) # pred: (1024, 6) 점or (1024,6,199)  # nan 발생 지
         pred = sixD2so3(pred.unsqueeze(2)).squeeze()  # pred: (1024, 3, 3)
@@ -207,7 +213,7 @@ def do_train_R(network, train_loader, device, epoch, optimizer, transforms=[]):
         train_preds.append(torch_to_numpy(pred))
         train_preds_cov.append(torch_to_numpy(pred_cov))
         train_losses.append(torch_to_numpy(loss))
-        # print("bid: ", bid)
+        print("bid: ", bid)
         if torch.any(torch.isnan(loss)):
             print("loss is finite: ", torch.any(torch.isfinite(loss)))
 
