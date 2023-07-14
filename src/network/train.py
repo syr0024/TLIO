@@ -193,7 +193,7 @@ def do_train_R(network, train_loader, device, epoch, optimizer, transforms=[]):
         pred = sixD2so3(pred.unsqueeze(2)).squeeze()  # pred: (1024, 3, 3)
 
         if len(pred.shape) == 3:
-            targ = sample["R_W_i"][:, -1, :, :]  # trag: (1024, 3, 3)
+            targ = sample["R_W_i"][:, -1, :, :]  # trag: (1024, 3, 3) 1:N:20
         else:
         # Leave off zeroth element since it's 0's. Ex: Net predicts 199 if there's 200 GT
             targ = sample["R_W_i"][:, 1:, :, :].permute(0, 2, 3, 1) # trag: (1024, 3, 3, 199)
@@ -204,17 +204,17 @@ def do_train_R(network, train_loader, device, epoch, optimizer, transforms=[]):
         train_preds.append(torch_to_numpy(pred))
         train_preds_cov.append(torch_to_numpy(pred_cov))
         train_losses.append(torch_to_numpy(loss))
-        print("bid: ", bid)
+        # print("bid: ", bid)
         if torch.any(torch.isnan(loss)):
             print("loss is finite: ", torch.any(torch.isfinite(loss)))
 
         loss = loss.mean()
         loss.backward()
+        # NaN debugging
         if torch.any(torch.isnan(loss)):
             print("pred is finite: ", torch.any(torch.isfinite(pred)))
             print("pred: ", pred.mean())
             print("loss: ", loss)
-        # NaN debugging
         if torch.any(torch.isnan(pred)):
             print("pred is finite: ", torch.any(torch.isfinite(pred)))
             print("pred: ", pred.mean())
@@ -293,7 +293,7 @@ def write_summary(summary_writer, attr_dict, epoch, optimizer, mode):
     """ Given the attr_dict write summary and log the losses """
 
     mse_loss = np.mean((attr_dict["targets"] - attr_dict["preds"]) ** 2, axis=0)  #shape (3,3)
-    # mse_so3_loss = np.mean(loss_mse_so3(attr_dict["preds"], attr_dict["targets"]))   #pred와 targ각도차
+    mse_so3_loss = np.mean(loss_mse_so3(attr_dict["preds"], attr_dict["targets"]))   #pred와 targ각도차
     ml_loss = np.average(attr_dict["losses"])  #shape (1)
     sigmas = np.exp(attr_dict["preds_cov"])  #shape (3,3)
     # print("mse_loss size: ", mse_loss.shape)
@@ -306,7 +306,7 @@ def write_summary(summary_writer, attr_dict, epoch, optimizer, mode):
     #     assert sigmas.shape[1] == 3
     #     sigmas = sigmas[:, :, -1]
     summary_writer.add_scalar(f"{mode}_loss/mse_loss_avg", np.mean(mse_loss), epoch)
-    # summary_writer.add_scalar(f"{mode}_loss/mse_so3_loss_avg", np.mean(mse_so3_loss), epoch)
+    summary_writer.add_scalar(f"{mode}_loss/mse_so3_loss_avg", np.mean(mse_so3_loss), epoch)
     summary_writer.add_scalar(f"{mode}_loss/nll_loss_full", ml_loss, epoch)
     summary_writer.add_scalar(f"{mode}_dist/sigma_x", np.mean(sigmas[:, 0]), epoch)
     summary_writer.add_scalar(f"{mode}_dist/sigma_y", np.mean(sigmas[:, 1]), epoch)
