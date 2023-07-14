@@ -29,11 +29,11 @@ if __name__ == "__main__":
 
     # ------------------ architecture and training -----------------
     parser.add_argument("--lr", type=float, default=1e-04)
-    parser.add_argument("--batch_size", type=int, default=16)
+    parser.add_argument("--batch_size", type=int, default=1024)
     parser.add_argument("--epochs", type=int, default=10000, help="max num epochs")
     parser.add_argument("--arch", type=str, default="tcn")
     parser.add_argument("--cpu", action="store_true")
-    parser.add_argument("--input_dim", type=int, default=15) # imu_data(6) + rotation matrix(9) = 15
+    parser.add_argument("--input_dim", type=int, default=609) # hor*100+imu_data(6) + rotation matrix(9) = 15
     parser.add_argument("--output_dim", type=int, default=6)
     parser.add_argument("-j", "--workers", type=int, default=4)
     parser.add_argument("--dataset_style", type=str, default="mmap", 
@@ -61,11 +61,11 @@ if __name__ == "__main__":
 
     # ----- window size and inference freq -----
     parser.add_argument("--past_time", type=float, default=0.0)  # s
-    parser.add_argument("--window_time", type=float, default=1.0)  # s
+    parser.add_argument("--window_time", type=float, default=0.5)  # s
     parser.add_argument("--future_time", type=float, default=0.0)  # s
 
     # ----- for sampling in training / stepping in testing -----
-    parser.add_argument("--sample_freq", type=float, default=20.0)  # hz
+    parser.add_argument("--sample_freq", type=float, default=100.0)  # hz
 
     # ----- plotting and evaluation -----
     add_bool_arg(parser, "save_plot", default=True)

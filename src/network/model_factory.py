@@ -18,7 +18,7 @@ def get_model(arch, net_config, input_dim=15, output_dim=6):
         network = TlioTcn(
             input_dim,
             output_dim,
-            [64, 32, 32],
+            [64, 32],
             kernel_size=2,
             dropout=0.2,
             activation="GELU",
