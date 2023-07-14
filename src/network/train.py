@@ -187,6 +187,7 @@ def do_train_R(network, train_loader, device, epoch, optimizer, transforms=[]):
         sample = to_device(sample, device)
         for transform in transforms:
             sample = transform(sample)
+        # way1) input size: (1024, 6+9, 200)
         R_W_0 = sample["R_W_i"][:, 0, :, :]
         R_W_0 = R_W_0.flatten(start_dim = 1).unsqueeze(2).repeat(1, 1, 200)
         feat = torch.cat((sample["feats"]["imu0"], R_W_0), axis = 1).float()
