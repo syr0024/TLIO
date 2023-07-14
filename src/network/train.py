@@ -398,6 +398,7 @@ def net_train(args):
     """
     Main function for network training
     """
+\
     # os.mkdir(args.model_path, exist_ok=True)
     try:
         if args.root_dir is None:

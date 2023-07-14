@@ -11,7 +11,6 @@ import datetime
 
 if __name__ == "__main__":
     import argparse
-
     parser = argparse.ArgumentParser()
 
     # ------------------ directories -----------------
@@ -30,7 +29,7 @@ if __name__ == "__main__":
 
     # ------------------ architecture and training -----------------
     parser.add_argument("--lr", type=float, default=1e-04)
-    parser.add_argument("--batch_size", type=int, default=1024)
+    parser.add_argument("--batch_size", type=int, default=16)
     parser.add_argument("--epochs", type=int, default=10000, help="max num epochs")
     parser.add_argument("--arch", type=str, default="tcn")
     parser.add_argument("--cpu", action="store_true")
