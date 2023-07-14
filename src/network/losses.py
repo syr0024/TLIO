@@ -41,8 +41,12 @@ def loss_mse_so3(pred, targ):
     # loss = loss.unsqueeze(2).transpose(1, 2).bmm(loss.unsqueeze(2)).squeeze()  # tensor(1024,)
 
     ## lietorch
-    pred = SO3.InitFromVec(torch.from_numpy(compute_q_from_matrix(pred.cpu().detach().numpy())).cuda())
-    targ = SO3.InitFromVec(torch.from_numpy(compute_q_from_matrix(targ.cpu().detach().numpy())).cuda())
+    if pred.dtype == torch.float32 or pred.dtype == torch.float64:  # torch tensor
+        pred = SO3.InitFromVec(torch.from_numpy(compute_q_from_matrix(pred.cpu().detach().numpy())).cuda())
+        targ = SO3.InitFromVec(torch.from_numpy(compute_q_from_matrix(targ.cpu().detach().numpy())).cuda())
+    else:   # numpy
+        pred = SO3.InitFromVec(torch.from_numpy(compute_q_from_matrix(pred)).cuda())
+        targ = SO3.InitFromVec(torch.from_numpy(compute_q_from_matrix(targ)).cuda())
     loss = pred.inv()*targ
     loss = loss.log().unsqueeze(2)
     loss = loss.transpose(1,2).bmm(loss).squeeze()
