@@ -5,7 +5,7 @@ from network.model_tcn import TlioTcn
 from utils.logging import logging
 
 
-def get_model(arch, net_config, input_dim=15, output_dim=6):
+def get_model(arch, net_config, input_dim=12, output_dim=6):
     if arch == "resnet":
         network = ResNet1D(
             BasicBlock1D, input_dim, output_dim, [2, 2, 2, 2], net_config["in_dim"]
@@ -18,7 +18,7 @@ def get_model(arch, net_config, input_dim=15, output_dim=6):
         network = TlioTcn(
             input_dim,
             output_dim,
-            [64, 32],
+            [64, 64, 64, 64, 128, 128, 128],
             kernel_size=2,
             dropout=0.2,
             activation="GELU",

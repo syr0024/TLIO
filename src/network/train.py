@@ -83,10 +83,21 @@ def get_inference_so3(network, data_loader, device, epoch, transforms=[]):
             sample = transform(sample)
         # feat = sample["feats"]["imu0"]
         # way1) input size: (1024, 6+9, 200)
+        # R_W_0 = sample["R_W_i"][:, 0, :, :]
+        # R_W_0 = R_W_0.flatten(start_dim = 1).unsqueeze(2).repeat(1, 1, 200)
+        # feat = torch.cat((sample["feats"]["imu0"], R_W_0), axis = 1).float()
+
+        # #
+
         R_W_0 = sample["R_W_i"][:, 0, :, :]
-        R_W_0 = R_W_0.flatten(start_dim = 1).unsqueeze(2).repeat(1, 1, 200)
-        feat = torch.cat((sample["feats"]["imu0"], R_W_0), axis = 1).float()
-        #
+        R_W_0 = sample["R_W_i"][:,:,:,0:2].flatten(2).transpose(1,2)
+        feat = torch.cat((R_W_0,sample["feats"]["imu0"]), axis = 1).float()
+        # if(bid==0):
+        #     R_W_0 = sample["R_W_i"][:, 0, :, 0:2].flatten(1).unsqueeze(2)
+        # else:
+        #     R_W_0 = pred[:,:,0:2].flatten(1).unsqueeze(2)
+        # feat = torch.cat((sample["feats"]["imu0"], R_W_0), axis = 2).float()
+
         pred, pred_cov = network(feat)
         pred = sixD2so3(pred.unsqueeze(2)).squeeze()  # pred: (1024, 3, 3)
 
@@ -162,7 +173,7 @@ def do_train(network, train_loader, device, epoch, optimizer, transforms=[]):
         #    if param.requires_grad:
         #        print(name, ": ", param.grad)
 
-        torch.nn.utils.clip_grad_norm_(network.parameters(), 0.1, error_if_nonfinite=True)
+        torch.nn.utils.clip_grad_norm_(network.parameters(), 1.5, error_if_nonfinite=True)
         optimizer.step()
 
     train_targets = np.concatenate(train_targets, axis=0)
@@ -193,18 +204,17 @@ def do_train_R(network, train_loader, device, epoch, optimizer, transforms=[]):
         for transform in transforms:
             sample = transform(sample)
         # way1) input size: (1024, 6+9, 200)
-        # R_W_0 = sample["R_W_i"][:, 0, :, :]
         # R_W_0 = R_W_0.flatten(start_dim = 1).unsqueeze(2).repeat(1, 1, 200)
-        # feat = torch.cat((sample["feats"]["imu0"], R_W_0), axis = 1).float()
+        R_W_0 = sample["R_W_i"][:, 0, :, :]
+        R_W_0 = sample["R_W_i"][:,:,:,0:2].flatten(2).transpose(1,2)
+        feat = torch.cat((R_W_0,sample["feats"]["imu0"]), axis = 1).float()
+        # #
+        # if(bid==0):
+        #     R_W_0 = sample["R_W_i"][:, 0, :, 0:2].flatten(1).unsqueeze(2)
+        # else:
+        #     R_W_0 = pred[:,:,0:2].flatten(1).unsqueeze(2)
+        # feat = torch.cat((sample["feats"]["imu0"], R_W_0), axis = 2).float()
 
-        if(bid==0):
-            R_W_0 = sample["R_W_i"][:, 0, :, :].flatten(1)
-        else:
-            R_W_0 = pred.flatten(1)
-
-        # R_W_0 = R_W_0.flatten(start_dim = 1).unsqueeze(2).repeat(1, 1, 10)
-        feat = torch.cat((sample["feats"]["imu0"].flatten(1), R_W_0), axis = 1).unsqueeze(2).float()
-        #
         optimizer.zero_grad()
         pred, pred_cov = network(feat) # pred: (1024, 6) 점or (1024,6,199)  # nan 발생 지
         pred = sixD2so3(pred.unsqueeze(2)).squeeze()  # pred: (1024, 3, 3)
@@ -237,7 +247,7 @@ def do_train_R(network, train_loader, device, epoch, optimizer, transforms=[]):
             print("pred: ", pred.mean())
             print("loss: ", loss)
             input('stop: ')
-        torch.nn.utils.clip_grad_norm_(network.parameters(), 0.1, error_if_nonfinite=True)
+        torch.nn.utils.clip_grad_norm_(network.parameters(), 1.5, error_if_nonfinite=True)
         optimizer.step()
 
     train_targets = np.concatenate(train_targets, axis=0)
@@ -291,7 +301,7 @@ def do_train_dR(network, train_loader, device, epoch, optimizer, transforms=[]):
         loss = loss.mean()
         loss.backward()
 
-        torch.nn.utils.clip_grad_norm_(network.parameters(), 0.1, error_if_nonfinite=True)
+        torch.nn.utils.clip_grad_norm_(network.parameters(), 1.5, error_if_nonfinite=True)
         optimizer.step()
 
     train_targets = np.concatenate(train_targets, axis=0)
@@ -310,7 +320,7 @@ def write_summary(summary_writer, attr_dict, epoch, optimizer, mode):
     """ Given the attr_dict write summary and log the losses """
 
     mse_loss = np.mean((attr_dict["targets"] - attr_dict["preds"]) ** 2, axis=0)  #shape (3,3)
-    mse_so3_loss = np.mean(loss_mse_so3(attr_dict["preds"], attr_dict["targets"]).cpu().detach().numpy())   #pred와 targ각도차
+    mse_so3_loss = np.sqrt(loss_mse_so3(attr_dict["preds"], attr_dict["targets"]).cpu().detach().numpy())   #pred와 targ각도차
     ml_loss = np.average(attr_dict["losses"])  #shape (1)
     sigmas = np.exp(attr_dict["preds_cov"])  #shape (3,3)
     # print("mse_loss size: ", mse_loss.shape)
@@ -398,7 +408,6 @@ def net_train(args):
     """
     Main function for network training
     """
-\
     # os.mkdir(args.model_path, exist_ok=True)
     try:
         if args.root_dir is None:
