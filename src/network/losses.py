@@ -20,8 +20,12 @@ output:
 
 def loss_geo_so3(pred, targ):
     "Geodesic Loss of SO3"
-    M = pred * targ.transpose(1,2)
-    loss = torch.acos_(0.5*(M[:, 0, 0]+M[:, 1, 1]+M[:, 2, 2] - 1))
+    if pred.dtype == torch.float32 or pred.dtype == torch.float64:  # torch tensor
+        M = pred * targ.transpose(1,2)
+        loss = torch.acos_(0.5*(M[:, 0, 0]+M[:, 1, 1]+M[:, 2, 2] - 1))
+    else:   # numpy
+        M = pred * targ.transpose(0,2,1)
+        loss = np.arccos(0.5*(M[:, 0, 0]+M[:, 1, 1]+M[:, 2, 2] - 1))
     return loss
 
 def loss_mse_so3(pred, targ):
@@ -46,7 +50,7 @@ def loss_mse_so3(pred, targ):
         loss = compute_q_from_matrix(loss.cpu().detach().numpy())
         loss = SO3(torch.from_numpy(loss).unsqueeze(2).transpose(1,2).cuda().float())
     else:   # numpy
-        loss = pred * targ.linalg.inv()
+        loss = pred * np.linalg.inv(targ)
         loss = compute_q_from_matrix(loss)
         loss = SO3(torch.from_numpy(loss).unsqueeze(2).transpose(1,2).cuda().float())
     loss = loss.log().norm(dim=-1).squeeze()
