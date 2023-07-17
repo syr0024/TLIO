@@ -93,11 +93,9 @@ def get_inference_so3(network, data_loader, device, epoch, transforms=[]):
 
         if len(pred.shape) == 3:
             targ = sample["targ_dR_World"][:, -1, :, :]  # trag: (1024, 3, 3)
-            #targ = so32sixD(targ)  # trag: (1024, 6)
         else:
             # Leave off zeroth element since it's 0's. Ex: Net predicts 199 if there's 200 GT
             targ = sample["targ_dR_World"][:, 1:, :, :].permute(0, 2, 3, 1) # trag: (1024, 3, 3, 199)
-            #targ = so32sixD(targ)  # trag: (1024, 6, 199)
 
         loss = get_loss_so3(pred, pred_cov, targ, epoch)
         # loss = loss_geo_so3(pred, targ) # dR 학습하는 경우 사용
