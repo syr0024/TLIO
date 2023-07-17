@@ -42,14 +42,14 @@ def loss_mse_so3(pred, targ):
 
     ## lietorch
     if pred.dtype == torch.float32 or pred.dtype == torch.float64:  # torch tensor
-        pred = SO3.InitFromVec(torch.from_numpy(compute_q_from_matrix(pred.cpu().detach().numpy())).cuda())
-        targ = SO3.InitFromVec(torch.from_numpy(compute_q_from_matrix(targ.cpu().detach().numpy())).cuda())
+        loss = pred * targ.inverse()
+        loss = compute_q_from_matrix(loss.cpu().detach().numpy())
+        loss = SO3(torch.from_numpy(loss).unsqueeze(2).transpose(1,2).cuda().float())
     else:   # numpy
-        pred = SO3.InitFromVec(torch.from_numpy(compute_q_from_matrix(pred)).cuda())
-        targ = SO3.InitFromVec(torch.from_numpy(compute_q_from_matrix(targ)).cuda())
-    loss = pred.inv()*targ
-    loss = loss.log().unsqueeze(2)
-    loss = loss.transpose(1,2).bmm(loss).squeeze()
+        loss = pred * targ.linalg.inv()
+        loss = compute_q_from_matrix(loss)
+        loss = SO3(torch.from_numpy(loss).unsqueeze(2).transpose(1,2).cuda().float())
+    loss = loss.log().norm(dim=-1).squeeze()
     loss.requires_grad = True  # for backpropagation
 
     # NaN Debugging for so3_log
@@ -93,12 +93,13 @@ def loss_NLL_so3(pred, pred_cov, targ):
     # loss = weighted_term.squeeze() + 0.5 * torch.log((sigma[:, 0, 0]*sigma[:, 1, 1]*sigma[:, 2, 2])**2)
 
     ## lietorch
-    pred = SO3.InitFromVec(torch.from_numpy(compute_q_from_matrix(pred.cpu().detach().numpy())).cuda().float())
-    targ = SO3.InitFromVec(torch.from_numpy(compute_q_from_matrix(targ.cpu().detach().numpy())).cuda().float())
-    loss = pred.inv()*targ
-    loss = loss.log().unsqueeze(2)
+    loss = pred * targ.inverse()
+    loss = compute_q_from_matrix(loss.cpu().detach().numpy())
+    loss = SO3(torch.from_numpy(loss).unsqueeze(2).transpose(1,2).cuda().float())
+    loss = loss.log()
+
+    loss = 0.5*(loss.bmm(sigma.inverse()).bmm(loss.transpose(1,2)).squeeze()) + 0.5*(torch.log(sigma[:, 0, 0]*sigma[:, 1, 1]*sigma[:, 2, 2]))
     loss.requires_grad = True  # for backpropagation
-    loss = 0.5*(loss.transpose(1,2).bmm(sigma.inverse()).bmm(loss).squeeze()) + 0.5*(torch.log(sigma[:, 0, 0]*sigma[:, 1, 1]*sigma[:, 2, 2]))
 
     # NaN Debugging for so3_log
     # if torch.any(torch.isnan(loss)):
@@ -206,8 +207,8 @@ def get_loss(pred, pred_logstd, targ, epoch):
 
 def get_loss_so3(pred, pred_logstd, targ, epoch):
 
-    if epoch < 10:
-        loss = loss_geo_so3(pred, targ)
+    if epoch < 0:
+        loss = loss_mse_so3(pred, targ)
     else:
         loss = loss_NLL_so3(pred, pred_logstd, targ)
 
