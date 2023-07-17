@@ -15,7 +15,7 @@ import numpy as np
 import torch
 # from dataloader.dataset_fb import FbSequenceDataset
 from dataloader.tlio_data import TlioData
-from network.losses import get_loss, get_loss_so3, loss_mse_so3, loss_geo_so3
+from network.losses import get_loss, get_loss_so3, loss_geo_so3
 from network.model_factory import get_model
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
@@ -87,15 +87,17 @@ def get_inference_so3(network, data_loader, device, epoch, transforms=[]):
         R_W_0 = sample["R_W_i"][:, 0, :, :]
         R_W_0 = R_W_0.flatten(start_dim = 1).unsqueeze(2).repeat(1, 1, 200)
         feat = torch.cat((sample["feats"]["imu0"], R_W_0), axis = 1).float()
-        #
+        # feat = sample["feats"]["imu0"]
         pred, pred_cov = network(feat)
-        pred = sixD2so3(pred.unsqueeze(2)).squeeze()  # pred: (1024, 3, 3)
+        pred = sixD2so3(pred.unsqueeze(2)).squeeze()
 
         if len(pred.shape) == 3:
-            targ = sample["targ_dR_World"][:, -1, :, :]  # trag: (1024, 3, 3)
+            targ = sample["R_W_i"][:, -1, :, :]
+            # targ = sample["targ_dR_World"][:, -1, :, :] # dR 학습하는 경우 사용
         else:
             # Leave off zeroth element since it's 0's. Ex: Net predicts 199 if there's 200 GT
-            targ = sample["targ_dR_World"][:, 1:, :, :].permute(0, 2, 3, 1) # trag: (1024, 3, 3, 199)
+            targ = sample["R_W_i"][:, 1:, :, :].permute(0, 2, 3, 1)
+            # targ = sample["targ_dR_World"][:, 1:, :, :].permute(0, 2, 3, 1) # dR 학습하는 경우 사용
 
         loss = get_loss_so3(pred, pred_cov, targ, epoch)
         # loss = loss_geo_so3(pred, targ) # dR 학습하는 경우 사용
@@ -195,9 +197,9 @@ def do_train_R(network, train_loader, device, epoch, optimizer, transforms=[]):
         R_W_0 = sample["R_W_i"][:, 0, :, :]
         R_W_0 = R_W_0.flatten(start_dim = 1).unsqueeze(2).repeat(1, 1, 200)
         feat = torch.cat((sample["feats"]["imu0"], R_W_0), axis = 1).float()
-        #
+        # feat = sample["feats"]["imu0"]
         optimizer.zero_grad()
-        pred, pred_cov = network(feat) # pred: (1024, 6) 점or (1024,6,199)  # nan 발생 지
+        pred, pred_cov = network(feat) # pred: (1024, 6) or (1024,6,199)  # nan 발생 지점
         pred = sixD2so3(pred.unsqueeze(2)).squeeze()  # pred: (1024, 3, 3)
 
         if len(pred.shape) == 3:
@@ -212,13 +214,16 @@ def do_train_R(network, train_loader, device, epoch, optimizer, transforms=[]):
         train_preds.append(torch_to_numpy(pred))
         train_preds_cov.append(torch_to_numpy(pred_cov))
         train_losses.append(torch_to_numpy(loss))
+        # ================Debugging================== #
         # print("bid: ", bid)
         if torch.any(torch.isnan(loss)):
             print("loss is finite: ", torch.any(torch.isfinite(loss)))
+        # =========================================== #
 
         loss = loss.mean()
         loss.backward()
-        # NaN debugging
+
+        # ================Debugging================== #
         if torch.any(torch.isnan(loss)):
             print("pred is finite: ", torch.any(torch.isfinite(pred)))
             print("pred: ", pred.mean())
@@ -228,6 +233,8 @@ def do_train_R(network, train_loader, device, epoch, optimizer, transforms=[]):
             print("pred: ", pred.mean())
             print("loss: ", loss)
             input('stop: ')
+        # =========================================== #
+
         torch.nn.utils.clip_grad_norm_(network.parameters(), 0.1, error_if_nonfinite=True)
         optimizer.step()
 
@@ -301,7 +308,7 @@ def write_summary(summary_writer, attr_dict, epoch, optimizer, mode):
     """ Given the attr_dict write summary and log the losses """
 
     mse_loss = np.mean((attr_dict["targets"] - attr_dict["preds"]) ** 2, axis=0)  #shape (3,3)
-    mse_so3_loss = (loss_geo_so3(torch.from_numpy(attr_dict["preds"]), torch.from_numpy(attr_dict["targets"]))**0.5).numpy()   #pred와 targ각도차
+    mse_so3_loss = (loss_geo_so3(torch.from_numpy(attr_dict["preds"]), torch.from_numpy(attr_dict["targets"]))).numpy()
     ml_loss = np.average(attr_dict["losses"])  #shape (1)
     sigmas = np.exp(attr_dict["preds_cov"])  #shape (3,3)
     # print("mse_loss size: ", mse_loss.shape)

@@ -24,45 +24,6 @@ def loss_geo_so3(pred, targ):
     loss = torch.acos(0.5*(M[:, 0, 0]+M[:, 1, 1]+M[:, 2, 2] - 1))
     return loss
 
-def loss_mse_so3(pred, targ):
-
-    ## pred, targ is torch.tensor
-    # if pred.dim() < 4:
-    #     pred = pred.unsqueeze(3)
-    #     targ = targ.unsqueeze(3)
-
-    ## 기존 displacement loss 계산 방식
-    # loss = (pred - targ).pow(2).squeeze()   # tensor(1024,3,3)
-
-    ## lie_algebra so3_log 사용:  pred과 targ 사이의 각도차이가 작아지면서 nan 값이 나와 오류 발생
-    # pred = pred.float()
-    # targ = targ.float()
-    # loss = so3_log(targ.bmm(pred.inverse()).squeeze()).pow(2).squeeze()   # tensor(1024,3)
-    # loss = loss.unsqueeze(2).transpose(1, 2).bmm(loss.unsqueeze(2)).squeeze()  # tensor(1024,)
-
-    ## lietorch
-    loss = pred * targ.inverse()
-    loss = compute_q_from_matrix(loss.cpu().detach().numpy())
-    loss = SO3(torch.from_numpy(loss).unsqueeze(2).transpose(1,2).cuda().float())
-    loss = loss.log().norm(dim=-1)
-    loss.requires_grad = True  # for backpropagation
-
-    # NaN Debugging for so3_log
-    # if torch.any(torch.isnan(loss)):
-    #     nan_ind = torch.nonzero(torch.isnan(loss)).squeeze()
-    #     print('NaN value index of loss: ', nan_ind)
-    #     print('pred value: ', pred.data[nan_ind, :])
-    #     print('targ value: ', targ.data[nan_ind, :])
-    #     input()
-    # elif torch.any(torch.isnan(pred)):
-    #     nan_ind = torch.nonzero(torch.isnan(pred)).squeeze()
-    #     print('NaN value index of pred: ', nan_ind)
-    #     print('loss value: ', loss[nan_ind, :])
-    #     print('targ value: ', targ.data[nan_ind, :])
-    #     input()
-
-    return loss
-
 
 def loss_NLL_so3(pred, pred_cov, targ):
 
@@ -85,7 +46,7 @@ def loss_NLL_so3(pred, pred_cov, targ):
     # targ = targ.float()
     # residual = so3_log(pred.bmm(targ.transpose(1,2))).unsqueeze(2)
     # weighted_term = 0.5 * residual.transpose(1,2).bmm(sigma).bmm(residual)
-    # loss = weighted_term.squeeze() + 0.5 * torch.log((sigma[:, 0, 0]*sigma[:, 1, 1]*sigma[:, 2, 2])**2)
+    # loss = weighted_term.squeeze() + 0.5 * torch.log((sigma[:, 0, 0]*sigma[:, 1, 1]*sigma[:, 2, 2]))
 
     ## lietorch
     loss = pred * targ.inverse()
