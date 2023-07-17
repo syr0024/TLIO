@@ -198,10 +198,10 @@ def do_train_R(network, train_loader, device, epoch, optimizer, transforms=[]):
         for transform in transforms:
             sample = transform(sample)
         # way1) input size: (1024, 6+9, 200)
-        if(bid == 0):
-            R_W_0 = sample["R_W_i"][:, 0, :, 0:2].flatten(1).unsqueeze(2)
-        else:
-            R_W_0 = pred[:,:,0:2].flatten(1).unsqueeze(2).to(torch.float64)
+        # if(bid == 0):
+        R_W_0 = sample["R_W_i"][:, 0, :, 0:2].flatten(1).unsqueeze(2)
+        # else:
+        #     R_W_0 = pred[:,:,0:2].flatten(1).unsqueeze(2).to(torch.float64)
         # R_W_0 = sample["R_W_i"][:, 0, :, 0:2].flatten(1).unsqueeze(2)
         feat = torch.cat((R_W_0,sample["feats"]["imu0"]), axis = 2).float()
         #
