@@ -82,11 +82,15 @@ def get_inference_so3(network, data_loader, device, epoch, transforms=[]):
         sample = to_device(sample, device)
         for transform in transforms:
             sample = transform(sample)
-        # feat = sample["feats"]["imu0"]
-        # way1) input size: (1024, 6+9, 200)
+        # ========================= add R_W_0 ==========================
         R_W_0 = sample["R_W_i"][:, 0, :, :]
-        R_W_0 = R_W_0.flatten(start_dim = 1).unsqueeze(2).repeat(1, 1, 200)
-        feat = torch.cat((sample["feats"]["imu0"], R_W_0), axis = 1).float()
+        ## way1) input size: (1024, 6+9, 200)
+        # R_W_0 = R_W_0.flatten(start_dim = 1).unsqueeze(2).repeat(1, 1, 200)
+        # feat = torch.cat((sample["feats"]["imu0"], R_W_0), axis = 1).float()
+        ## way2) input size: (1024, 6, 201)
+        R_W_0 = R_W_0.transpose(1,2).flatten(start_dim = 1)[:,:6].unsqueeze(2)
+        feat = torch.cat((sample["feats"]["imu0"], R_W_0), axis=2).float()
+        # ==============================================================
         # feat = sample["feats"]["imu0"]
         pred, pred_cov = network(feat)
         pred = sixD2so3(pred.unsqueeze(2)).squeeze()
@@ -193,10 +197,17 @@ def do_train_R(network, train_loader, device, epoch, optimizer, transforms=[]):
         sample = to_device(sample, device)
         for transform in transforms:
             sample = transform(sample)
-        # way1) input size: (1024, 6+9, 200)
+
+        # ========================= add R_W_0 ==========================
         R_W_0 = sample["R_W_i"][:, 0, :, :]
-        R_W_0 = R_W_0.flatten(start_dim = 1).unsqueeze(2).repeat(1, 1, 200)
-        feat = torch.cat((sample["feats"]["imu0"], R_W_0), axis = 1).float()
+        ## way1) input size: (1024, 6+9, 200)
+        # R_W_0 = R_W_0.flatten(start_dim = 1).unsqueeze(2).repeat(1, 1, 200)
+        # feat = torch.cat((sample["feats"]["imu0"], R_W_0), axis = 1).float()
+        ## way2) input size: (1024, 6, 201)
+        R_W_0 = R_W_0.transpose(1,2).flatten(start_dim = 1)[:,:6].unsqueeze(2)
+        feat = torch.cat((sample["feats"]["imu0"], R_W_0), axis=2).float()
+        # ==============================================================
+
         # feat = sample["feats"]["imu0"]
         optimizer.zero_grad()
         pred, pred_cov = network(feat) # pred: (1024, 6) or (1024,6,199)  # nan 발생 지점
