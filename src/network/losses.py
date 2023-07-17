@@ -97,9 +97,8 @@ def loss_NLL_so3(pred, pred_cov, targ):
     loss = compute_q_from_matrix(loss.cpu().detach().numpy())
     loss = SO3(torch.from_numpy(loss).unsqueeze(2).transpose(1,2).cuda().float())
     loss = loss.log()
-
-    loss = 0.5*(loss.bmm(sigma.inverse()).bmm(loss.transpose(1,2)).squeeze()) + 0.5*(torch.log(sigma[:, 0, 0]*sigma[:, 1, 1]*sigma[:, 2, 2]))
     loss.requires_grad = True  # for backpropagation
+    loss = 0.5*(loss.bmm(sigma.inverse()).bmm(loss.transpose(1,2)).squeeze()) + 0.5*(torch.log(sigma[:, 0, 0]*sigma[:, 1, 1]*sigma[:, 2, 2]))
 
     # NaN Debugging for so3_log
     # if torch.any(torch.isnan(loss)):
@@ -108,6 +107,7 @@ def loss_NLL_so3(pred, pred_cov, targ):
     #     print('pred value: ', pred.data[nan_ind, :])
     #     print('targ value: ', targ.data[nan_ind, :])
     #     input()
+
     # elif torch.any(torch.isnan(pred)):
     #     nan_ind = torch.nonzero(torch.isnan(pred)).squeeze()
     #     print('NaN value index of pred: ', nan_ind)
