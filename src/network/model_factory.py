@@ -19,7 +19,7 @@ def get_model(arch, net_config, input_dim=12, output_dim=6):
             input_dim,
             output_dim,
             [64, 64, 64, 64, 128, 128, 128],
-            kernel_size=2,
+            kernel_size=4,
             dropout=0.2,
             activation="GELU",
         )

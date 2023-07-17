@@ -93,7 +93,7 @@ class TemporalConvNet(nn.Module):
         self,
         num_inputs,
         num_hidden_channels,
-        kernel_size=2,
+        kernel_size=16,
         dropout=0.2,
         activation="ReLU",
     ):
@@ -150,7 +150,7 @@ class TlioTcn(nn.Module):
             activation=dict_activation[activation],
         )
         self.linear1 = nn.Linear(num_channels[-1], output_size)
-        self.linear2 = nn.Linear(num_channels[-1], output_size)
+        self.linear2 = nn.Linear(num_channels[-1], 3)
         self.init_weights()
 
     def init_weights(self):
