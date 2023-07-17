@@ -15,7 +15,7 @@ import numpy as np
 import torch
 # from dataloader.dataset_fb import FbSequenceDataset
 from dataloader.tlio_data import TlioData
-from network.losses import get_loss, get_loss_so3, loss_geo_so3
+from network.losses import get_loss, get_loss_so3, loss_mse_so3
 from network.model_factory import get_model
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
@@ -100,7 +100,7 @@ def get_inference_so3(network, data_loader, device, epoch, transforms=[]):
             #targ = so32sixD(targ)  # trag: (1024, 6, 199)
 
         loss = get_loss_so3(pred, pred_cov, targ, epoch)
-        # loss = loss_geo_so3(pred, targ) # dR 학습하는 경우 사용
+        # loss = loss_mse_so3(pred, targ) # dR 학습하는 경우 사용
 
         targets_all.append(torch_to_numpy(targ))
         preds_all.append(torch_to_numpy(pred))
@@ -248,7 +248,7 @@ def do_train_R(network, train_loader, device, epoch, optimizer, transforms=[]):
 def do_train_dR(network, train_loader, device, epoch, optimizer, transforms=[]):
     """
     rotation matrix의 차이를 계산하는 network, 이 네트워크를 사용하기 위해서는 net_train에서 do_train 부분을 do_train_dR로 바꿔주고
-    get_inference_so3 get_loss 부분을 loss_geo_so3로 바꿔주기.
+    get_inference_so3 get_loss 부분을 loss_mse_so3로 바꿔주기.
     Train network for one epoch using a specified data loader
     Outputs all targets, predicts, predicted covariance params, and losses in numpy arrays
     """
@@ -273,7 +273,7 @@ def do_train_dR(network, train_loader, device, epoch, optimizer, transforms=[]):
             targ = sample["targ_dR_World"][:, 1:, :, :].permute(0, 2, 3, 1) # trag: (1024, 3, 3, 199)
             #targ = so32sixD(targ)  # trag: (1024, 6, 199)
 
-        loss = loss_geo_so3(pred, targ)
+        loss = loss_mse_so3(pred, targ)
         # loss = get_loss_so3(pred, pred_cov, targ, epoch)
 
         train_targets.append(torch_to_numpy(targ))
@@ -303,7 +303,7 @@ def write_summary(summary_writer, attr_dict, epoch, optimizer, mode):
     """ Given the attr_dict write summary and log the losses """
 
     mse_loss = np.mean((attr_dict["targets"] - attr_dict["preds"]) ** 2, axis=0)  #shape (3,3)
-    mse_so3_loss = (loss_geo_so3(attr_dict["preds"], attr_dict["targets"])**(0.5)).cpu().detach().numpy()   #pred와 targ각도차
+    mse_so3_loss = (loss_mse_so3(attr_dict["preds"], attr_dict["targets"])**(0.5)).cpu().detach().numpy()   #pred와 targ각도차
     ml_loss = np.average(attr_dict["losses"])  #shape (1)
     sigmas = np.exp(attr_dict["preds_cov"])  #shape (3,3)
     # print("mse_loss size: ", mse_loss.shape)
