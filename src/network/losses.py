@@ -27,21 +27,15 @@ def loss_geo_so3(pred, targ):
 
 def loss_NLL_so3(pred, pred_cov, targ):
 
-    ## pred, targ is torch.tensor
-    # if pred.dim() < 4:
-    #     pred = pred.unsqueeze(3)
-    #     targ = targ.unsqueeze(3)
+    pred_cov = torch.exp(2*pred_cov)
 
-    N = pred_cov.size()
-    sigma = torch.zeros(N[0],3,3).cuda()
-    sigma[:, 0, 0] = torch.exp(2*pred_cov[:, 0].squeeze())
-    sigma[:, 1, 1] = torch.exp(2*pred_cov[:, 1].squeeze())
-    sigma[:, 2, 2] = torch.exp(2*pred_cov[:, 2].squeeze())
+    # N = pred_cov.size()
+    # sigma = torch.zeros(N[0],3,3).cuda()
+    # sigma[:, 0, 0] = torch.exp(2*pred_cov[:, 0].squeeze())
+    # sigma[:, 1, 1] = torch.exp(2*pred_cov[:, 1].squeeze())
+    # sigma[:, 2, 2] = torch.exp(2*pred_cov[:, 2].squeeze())
 
-    ## 기존 displacement loss 계산 방식
-    # loss = (pred - targ).pow(2) / (2 * torch.exp(2 * pred_cov)) + pred_cov
-
-    ## lie_algebra so3_log 사용: pred과 targ 사이의 각도차이가 작아지면서 nan 값이 나와 오류 발생
+    ## lie_algebra so3_log 사용: loss 각도 차이가 pi 근처일 때 network gradient not finite
     # pred = pred.float()
     # targ = targ.float()
     # residual = so3_log(pred.bmm(targ.transpose(1,2))).unsqueeze(2)
@@ -49,12 +43,16 @@ def loss_NLL_so3(pred, pred_cov, targ):
     # loss = weighted_term.squeeze() + 0.5 * torch.log((sigma[:, 0, 0]*sigma[:, 1, 1]*sigma[:, 2, 2]))
 
     ## lietorch
-    loss = pred * targ.inverse()
-    loss = compute_q_from_matrix(loss.cpu().detach().numpy())
-    loss = SO3(torch.from_numpy(loss).unsqueeze(2).transpose(1,2).cuda().float())
-    loss = loss.log()
-    loss.requires_grad = True  # for backpropagation
-    loss = 0.5*(loss.bmm(sigma.inverse()).bmm(loss.transpose(1,2)).squeeze()) + 0.5*(torch.log(sigma[:, 0, 0]*sigma[:, 1, 1]*sigma[:, 2, 2]))
+    # loss = pred * targ.inverse()
+    # loss = compute_q_from_matrix(loss.cpu().detach().numpy())
+    # loss = SO3(torch.from_numpy(loss).unsqueeze(2).transpose(1,2).cuda().float())
+    # loss = loss.log()
+    # loss.requires_grad = True  # for backpropagation
+    # loss = 0.5*(loss.bmm(sigma.inverse()).bmm(loss.transpose(1,2)).squeeze()) + 0.5*(torch.log(sigma[:, 0, 0]*sigma[:, 1, 1]*sigma[:, 2, 2]))
+
+    M = pred * targ.transpose(1,2)
+    loss = torch.acos(0.5*(M[:, 0, 0]+M[:, 1, 1]+M[:, 2, 2] - 1))
+    loss = 0.5*loss.square() / pred_cov.norm(dim=-1) + 0.5*torch.log(pred_cov.norm(dim=-1))
 
     # NaN Debugging for so3_log
     # if torch.any(torch.isnan(loss)):
