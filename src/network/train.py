@@ -82,7 +82,6 @@ def get_inference_so3(network, data_loader, device, epoch, transforms=[]):
         sample = to_device(sample, device)
         for transform in transforms:
             sample = transform(sample)
-
         # ========================= add R_W_0 ==========================
         R_W_0 = sample["R_W_i"][:, 0, :, :]
         ## way1) input size: (1024, 6+9, 200)
@@ -91,7 +90,8 @@ def get_inference_so3(network, data_loader, device, epoch, transforms=[]):
         ## way2) input size: (1024, 6, 201)
         R_W_0 = R_W_0.transpose(1,2).flatten(start_dim = 1)[:,:6].unsqueeze(2)
         feat = torch.cat((sample["feats"]["imu0"], R_W_0), axis=2).float()
-
+        # ==============================================================
+        # feat = sample["feats"]["imu0"]
         pred, pred_cov = network(feat)
         pred = sixD2so3(pred.unsqueeze(2)).squeeze()
 
@@ -167,7 +167,7 @@ def do_train(network, train_loader, device, epoch, optimizer, transforms=[]):
         #    if param.requires_grad:
         #        print(name, ": ", param.grad)
 
-        torch.nn.utils.clip_grad_norm_(network.parameters(), 1.5, error_if_nonfinite=True)
+        torch.nn.utils.clip_grad_norm_(network.parameters(), 0.1, error_if_nonfinite=True)
         optimizer.step()
 
     train_targets = np.concatenate(train_targets, axis=0)
@@ -197,56 +197,38 @@ def do_train_R(network, train_loader, device, epoch, optimizer, transforms=[]):
         sample = to_device(sample, device)
         for transform in transforms:
             sample = transform(sample)
-
         # way1) input size: (1024, 6+9, 200)
-        # R_W_0 = R_W_0.flatten(start_dim = 1).unsqueeze(2).repeat(1, 1, 200)
-
-        if(bid==0):
+        if(bid == 0):
             R_W_0 = sample["R_W_i"][:, 0, :, 0:2].flatten(1).unsqueeze(2)
         else:
-            R_W_0 = pred[:,:,0:2].flatten(1).unsqueeze(2)
+            R_W_0 = pred[:,:,0:2].flatten(1).unsqueeze(2).to(torch.float64)
+        # R_W_0 = sample["R_W_i"][:, 0, :, 0:2].flatten(1).unsqueeze(2)
         feat = torch.cat((R_W_0,sample["feats"]["imu0"]), axis = 2).float()
-
-        # #
-        # if(bid==0):
-        #     R_W_0 = sample["R_W_i"][:, 0, :, 0:2].flatten(1).unsqueeze(2)
-        # else:
-        #     R_W_0 = pred[:,:,0:2].flatten(1).unsqueeze(2)
-        # feat = torch.cat((sample["feats"]["imu0"], R_W_0), axis = 2).float()
-
+        #
         optimizer.zero_grad()
-        pred, pred_cov = network(feat) # pred: (1024, 6) or (1024,6,199)  # nan 발생 지점
+        pred, pred_cov = network(feat) # pred: (1024, 6) 점or (1024,6,199)  # nan 발생 지
         pred = sixD2so3(pred.unsqueeze(2)).squeeze()  # pred: (1024, 3, 3)
-        print("Device : ", device)
-        print("Current cuda device : " , torch.cuda.current_device())
-        print("bid : " , bid)
-        print("pred_ : " , pred[0,:,:])
-        print("pred_cov : " , pred_cov[0,:])
-        print("epoch : " , epoch)
+
         if len(pred.shape) == 3:
-            targ = sample["R_W_i"][:, -1, :, :]  # trag: (1024, 3, 3) 1:N:20
+            targ = sample["R_W_i"][:, -1, :, :].clone()  # trag: (1024, 3, 3) 1:N:20
         else:
         # Leave off zeroth element since it's 0's. Ex: Net predicts 199 if there's 200 GT
-            targ = sample["R_W_i"][:, 1:, :, :].permute(0, 2, 3, 1) # trag: (1024, 3, 3, 199)
+            targ = sample["R_W_i"][:, 1:, :, :].clone().permute(0, 2, 3, 1) # trag: (1024, 3, 3, 199)
 
         loss = get_loss_so3(pred, pred_cov, targ, epoch)
 
-        print("targ : " , targ[0,:,:])
-        print("loss : " , loss[0])
-        train_targets.append(torch_to_numpy(targ.data.cpu()))
-        train_preds.append(torch_to_numpy(pred.data.cpu()))
-        train_preds_cov.append(torch_to_numpy(pred_cov.data.cpu()))
-        train_losses.append(torch_to_numpy(loss.data.cpu()))
-        # ================Debugging================== #
+        train_targets.append(torch_to_numpy(targ))
+        train_preds.append(torch_to_numpy(pred))
+        train_preds_cov.append(torch_to_numpy(pred_cov))
+        train_losses.append(torch_to_numpy(loss))
         # print("bid: ", bid)
         if torch.any(torch.isnan(loss)):
             print("loss is finite: ", torch.any(torch.isfinite(loss)))
-        # =========================================== #
 
         loss = loss.mean()
         loss.backward(retain_graph=True)
 
-        # ================Debugging================== #
+        # NaN debugging
         if torch.any(torch.isnan(loss)):
             print("pred is finite: ", torch.any(torch.isfinite(pred)))
             print("pred: ", pred.mean())
@@ -256,10 +238,9 @@ def do_train_R(network, train_loader, device, epoch, optimizer, transforms=[]):
             print("pred: ", pred.mean())
             print("loss: ", loss)
             input('stop: ')
-
         torch.nn.utils.clip_grad_norm_(network.parameters(), 0.1, error_if_nonfinite=True)
-
         optimizer.step()
+
 
     train_targets = np.concatenate(train_targets, axis=0)
     train_preds = np.concatenate(train_preds, axis=0)
@@ -276,7 +257,7 @@ def do_train_R(network, train_loader, device, epoch, optimizer, transforms=[]):
 def do_train_dR(network, train_loader, device, epoch, optimizer, transforms=[]):
     """
     rotation matrix의 차이를 계산하는 network, 이 네트워크를 사용하기 위해서는 net_train에서 do_train 부분을 do_train_dR로 바꿔주고
-    get_inference_so3 get_loss 부분을 loss_geo_so3로 바꿔주기.
+    get_inference_so3 get_loss 부분을 loss_mse_so3로 바꿔주기.
     Train network for one epoch using a specified data loader
     Outputs all targets, predicts, predicted covariance params, and losses in numpy arrays
     """
@@ -312,7 +293,7 @@ def do_train_dR(network, train_loader, device, epoch, optimizer, transforms=[]):
         loss = loss.mean()
         loss.backward()
 
-        torch.nn.utils.clip_grad_norm_(network.parameters(), 1.5, error_if_nonfinite=True)
+        torch.nn.utils.clip_grad_norm_(network.parameters(), 0.1, error_if_nonfinite=True)
         optimizer.step()
 
     train_targets = np.concatenate(train_targets, axis=0)
@@ -331,9 +312,7 @@ def write_summary(summary_writer, attr_dict, epoch, optimizer, mode):
     """ Given the attr_dict write summary and log the losses """
 
     mse_loss = np.mean((attr_dict["targets"] - attr_dict["preds"]) ** 2, axis=0)  #shape (3,3)
-
-    mse_so3_loss = (loss_geo_so3(torch.from_numpy(attr_dict["preds"]), torch.from_numpy(attr_dict["targets"]))).numpy()
-
+    mse_so3_loss = np.sqrt((loss_geo_so3(torch.Tensor(attr_dict["preds"]), torch.Tensor(attr_dict["targets"])).cpu().detach().numpy()))#pred와 targ각도차
     ml_loss = np.average(attr_dict["losses"])  #shape (1)
     sigmas = np.exp(attr_dict["preds_cov"])  #shape (3,3)
     # print("mse_loss size: ", mse_loss.shape)
@@ -357,7 +336,7 @@ def write_summary(summary_writer, attr_dict, epoch, optimizer, mode):
             "optimizer/lr", optimizer.param_groups[0]["lr"], epoch - 1
         )
     logging.info(
-        f"{mode}: average ml loss: {ml_loss}, average mse loss: {np.mean(mse_loss)}, average mse so3 loss: {np.mean(mse_so3_loss)}"
+        f"{mode}: average ml loss: {ml_loss}, average mse loss: {np.mean(mse_loss)}, average mse so3 loss: {mse_so3_loss}"
     )
 
 
@@ -506,7 +485,7 @@ def net_train(args):
         return
     """
     train_loader = data.train_dataloader()
-    train_transforms = data.get_train_transforms()
+    train_transforms = data.get_train_transforms() # TODO what?
 
     end_t = time.time()
     logging.info(f"Training set loaded. Loading time: {end_t - start_t:.3f}s")
@@ -563,9 +542,8 @@ def net_train(args):
             logging.info(
                 f"Detected saved checkpoint, starting from epoch {start_epoch}"
             )
-
-    title = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-    summary_writer = SummaryWriter(osp.join(args.out_dir, f"logs/{title}"))
+# TODO : have to erase the checkpoint files?
+    summary_writer = SummaryWriter(osp.join(args.out_dir, "logs"))
     summary_writer.add_text("info", f"total_param: {total_params}")
 
     logging.info(f"-------------- Init, Epoch {start_epoch} --------------")
@@ -583,6 +561,8 @@ def net_train(args):
         sys.exit()
 
     best_val_loss = np.inf
+
+    # TODO : ACTUAL TRAININGdd
     for epoch in range(start_epoch + 1, args.epochs):
         signal.signal(
             signal.SIGINT, partial(stop_signal_handler, args, epoch, network, optimizer)

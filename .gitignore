@@ -2,8 +2,8 @@ local_data/*
 models/*
 models/resnet/*
 src/models/*
-lietorch/
-src/network/__pycache__/
+lietorch/*
+src/network/__pycache__/*
 *.egg-info
 *.txt
 *.zip
@@ -12,3 +12,7 @@ src/network/__pycache__/
 *.wmv
 *.cpython-39.pyc
 *.pt
+*.idea/*
+models/resnet/parameters.json
+src/dataloader/__pycache__/*
+src/network/__pycache__/*

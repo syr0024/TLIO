@@ -23,23 +23,21 @@ if __name__ == "__main__":
         "--root_dir", type=str, 
         default="local_data/tlio_golden", help="Path to data directory"
     )
-    parser.add_argument("--out_dir", type=str, default="models/resnet")
+    parser.add_argument("--out_dir", type=str, default="models/resnet"+datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S"))
     parser.add_argument("--model_path", type=str, default=None)
     parser.add_argument("--continue_from", type=str, default=None)
     parser.add_argument("--out_name", type=str, default=None)
 
     # ------------------ architecture and training -----------------
-    parser.add_argument("--lr", type=float, default=0.00025)
-    parser.add_argument("--batch_size", type=int, default=1024)
+    parser.add_argument("--lr", type=float, default=1e-04)
+    parser.add_argument("--batch_size", type=int, default=1024) # TODO? why is it 1024?
     parser.add_argument("--epochs", type=int, default=10000, help="max num epochs")
-    parser.add_argument("--arch", type=str, default="tcn")
+    parser.add_argument("--arch", type=str, default="resnet")
     parser.add_argument("--cpu", action="store_true")
-<<<<<<< HEAD
-    parser.add_argument("--input_dim", type=int, default=6) # imu_data(6) + rotation matrix(6) = 15
-=======
+
     parser.add_argument("--input_dim", type=int, default=6) # imu_data(6) + rotation matrix(9) = 15
->>>>>>> 8843c6149b984b70ac45ccbcbfe732021c1fec65
     parser.add_argument("--output_dim", type=int, default=6)
+
     parser.add_argument("-j", "--workers", type=int, default=4)
     parser.add_argument("--dataset_style", type=str, default="mmap", 
             help="'ram', 'mmap', or 'iter'. See dataloader/tlio_data.py for more details")

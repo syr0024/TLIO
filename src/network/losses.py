@@ -48,18 +48,8 @@ def loss_NLL_so3(pred, pred_cov, targ):
     loss = SO3.InitFromVec(torch.from_numpy(loss).cuda().float())
     loss = loss.log().unsqueeze(1)
     loss.requires_grad = True  # for backpropagation
-<<<<<<< HEAD
-    pred_cov = pred_cov.unsqueeze(1)
-    loss = 0.5 * torch.sum(loss.square()/pred_cov, 2) + 0.5*torch.log(pred_cov.norm(dim=-1))
-    # loss = 0.5*(loss.bmm(pred_cov.inverse()).bmm(loss.transpose(1,2)).squeeze()) + 0.5*(torch.log(pred_cov[:, 0, 0]*pred_cov[:, 1, 1]*pred_cov[:, 2, 2]))
-
-    # M = pred * targ.transpose(1,2)
-    # loss = torch.acos(0.5*(M[:, 0, 0]+M[:, 1, 1]+M[:, 2, 2] - 1))
-    # loss = 0.5*loss.square() / pred_cov.norm(dim=-1) + 0.5*torch.log(pred_cov.norm(dim=-1))
-=======
     # loss = 0.5 * torch.sum(loss**2/pred_cov, 1) + 0.5*torch.log(pred_cov.norm(dim=-1))
     loss = 0.5*(loss.bmm(sigma.inverse()).bmm(loss.transpose(1,2)).squeeze()) + 0.5*(torch.log(sigma[:, 0, 0]*sigma[:, 1, 1]*sigma[:, 2, 2]))
->>>>>>> 8843c6149b984b70ac45ccbcbfe732021c1fec65
 
     # NaN Debugging for so3_log
     # if torch.any(torch.isnan(loss)):

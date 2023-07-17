@@ -191,8 +191,8 @@ class ResNet1D(nn.Module):
         )
 
         # Output module
-        self.output_block1 = FcBlock(512, out_dim, inter_dim)  # 512 * block_type.expansion
-        self.output_block2 = FcBlock(512, 3, inter_dim)  # uncertainty  # 512 * block_type.expansion
+        self.output_block1 = FcBlock(512 * block_type.expansion, out_dim, inter_dim)
+        self.output_block2 = FcBlock(512 * block_type.expansion, 3, inter_dim)  # uncertainty
 
         self._initialize(zero_init_residual)
 
