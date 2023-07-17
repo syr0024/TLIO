@@ -43,16 +43,17 @@ def loss_NLL_so3(pred, pred_cov, targ):
     # loss = weighted_term.squeeze() + 0.5 * torch.log((sigma[:, 0, 0]*sigma[:, 1, 1]*sigma[:, 2, 2]))
 
     ## lietorch
-    # loss = pred * targ.inverse()
-    # loss = compute_q_from_matrix(loss.cpu().detach().numpy())
-    # loss = SO3(torch.from_numpy(loss).unsqueeze(2).transpose(1,2).cuda().float())
-    # loss = loss.log()
-    # loss.requires_grad = True  # for backpropagation
+    loss = pred * targ.inverse()
+    loss = compute_q_from_matrix(loss.cpu().detach().numpy())
+    loss = SO3(torch.from_numpy(loss).unsqueeze(2).transpose(1,2).cuda().float())
+    loss = loss.log()
+    loss.requires_grad = True  # for backpropagation
+    loss = 0.5 * torch.sum(loss.square()/pred_cov, 1) + 0.5*torch.log(pred_cov.norm(dim=-1))
     # loss = 0.5*(loss.bmm(sigma.inverse()).bmm(loss.transpose(1,2)).squeeze()) + 0.5*(torch.log(sigma[:, 0, 0]*sigma[:, 1, 1]*sigma[:, 2, 2]))
 
-    M = pred * targ.transpose(1,2)
-    loss = torch.acos(0.5*(M[:, 0, 0]+M[:, 1, 1]+M[:, 2, 2] - 1))
-    loss = 0.5*loss.square() / pred_cov.norm(dim=-1) + 0.5*torch.log(pred_cov.norm(dim=-1))
+    # M = pred * targ.transpose(1,2)
+    # loss = torch.acos(0.5*(M[:, 0, 0]+M[:, 1, 1]+M[:, 2, 2] - 1))
+    # loss = 0.5*loss.square() / pred_cov.norm(dim=-1) + 0.5*torch.log(pred_cov.norm(dim=-1))
 
     # NaN Debugging for so3_log
     # if torch.any(torch.isnan(loss)):
@@ -161,7 +162,7 @@ def get_loss(pred, pred_logstd, targ, epoch):
 
 def get_loss_so3(pred, pred_logstd, targ, epoch):
 
-    if epoch < 10:
+    if epoch < 0:
         loss = loss_geo_so3(pred, targ)
     else:
         loss = loss_NLL_so3(pred, pred_logstd, targ)
