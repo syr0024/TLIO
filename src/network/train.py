@@ -303,7 +303,7 @@ def write_summary(summary_writer, attr_dict, epoch, optimizer, mode):
     """ Given the attr_dict write summary and log the losses """
 
     mse_loss = np.mean((attr_dict["targets"] - attr_dict["preds"]) ** 2, axis=0)  #shape (3,3)
-    mse_so3_loss = (loss_geo_so3(attr_dict["preds"], attr_dict["targets"])**(0.5))   #pred와 targ각도차
+    mse_so3_loss = (loss_geo_so3(torch.from_numpy(attr_dict["preds"]), torch.from_numpy(attr_dict["targets"]))**0.5).numpy()   #pred와 targ각도차
     ml_loss = np.average(attr_dict["losses"])  #shape (1)
     sigmas = np.exp(attr_dict["preds_cov"])  #shape (3,3)
     # print("mse_loss size: ", mse_loss.shape)

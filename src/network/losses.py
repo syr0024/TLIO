@@ -20,12 +20,8 @@ output:
 
 def loss_geo_so3(pred, targ):
     "Geodesic Loss of SO3"
-    if pred.dtype == torch.float32 or pred.dtype == torch.float64:  # torch tensor
-        M = pred * targ.transpose(1,2)
-        loss = torch.acos_(0.5*(M[:, 0, 0]+M[:, 1, 1]+M[:, 2, 2] - 1))
-    else:   # numpy
-        M = pred * targ.transpose(0,2,1)
-        loss = np.arccos(0.5*(M[:, 0, 0]+M[:, 1, 1]+M[:, 2, 2] - 1))
+    M = pred * targ.transpose(1,2)
+    loss = torch.acos(0.5*(M[:, 0, 0]+M[:, 1, 1]+M[:, 2, 2] - 1))
     return loss
 
 def loss_mse_so3(pred, targ):
@@ -45,15 +41,10 @@ def loss_mse_so3(pred, targ):
     # loss = loss.unsqueeze(2).transpose(1, 2).bmm(loss.unsqueeze(2)).squeeze()  # tensor(1024,)
 
     ## lietorch
-    if pred.dtype == torch.float32 or pred.dtype == torch.float64:  # torch tensor
-        loss = pred * targ.inverse()
-        loss = compute_q_from_matrix(loss.cpu().detach().numpy())
-        loss = SO3(torch.from_numpy(loss).unsqueeze(2).transpose(1,2).cuda().float())
-    else:   # numpy
-        loss = pred * np.linalg.inv(targ)
-        loss = compute_q_from_matrix(loss)
-        loss = SO3(torch.from_numpy(loss).unsqueeze(2).transpose(1,2).cuda().float())
-    loss = loss.log().norm(dim=-1).squeeze()
+    loss = pred * targ.inverse()
+    loss = compute_q_from_matrix(loss.cpu().detach().numpy())
+    loss = SO3(torch.from_numpy(loss).unsqueeze(2).transpose(1,2).cuda().float())
+    loss = loss.log().norm(dim=-1)
     loss.requires_grad = True  # for backpropagation
 
     # NaN Debugging for so3_log
@@ -211,8 +202,8 @@ def get_loss(pred, pred_logstd, targ, epoch):
 
 def get_loss_so3(pred, pred_logstd, targ, epoch):
 
-    if epoch < 10:
-        loss = loss_mse_so3(pred, targ)
+    if epoch < 0:
+        loss = loss_geo_so3(pred, targ)
     else:
         loss = loss_NLL_so3(pred, pred_logstd, targ)
 
