@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 from network.covariance_parametrization import DiagonalParam
-from lietorch import SO3, LieGroupParameter
+from lietorch import SO3
 from utils.lie_algebra import so3_log, batch_trace
 from utils.from_scipy import compute_q_from_matrix
 from utils.math_utils import logdet3, sixD2so3, so32sixD
@@ -27,13 +27,13 @@ def loss_geo_so3(pred, targ):
 
 def loss_NLL_so3(pred, pred_cov, targ):
 
-    pred_cov = torch.exp(2*pred_cov)
+    # pred_cov = torch.exp(2*pred_cov)
 
-    # N = pred_cov.size()
-    # sigma = torch.zeros(N[0],3,3).cuda()
-    # sigma[:, 0, 0] = torch.exp(2*pred_cov[:, 0].squeeze())
-    # sigma[:, 1, 1] = torch.exp(2*pred_cov[:, 1].squeeze())
-    # sigma[:, 2, 2] = torch.exp(2*pred_cov[:, 2].squeeze())
+    N = pred_cov.size()
+    sigma = torch.zeros(N[0],3,3).cuda()
+    sigma[:, 0, 0] = torch.exp(2*pred_cov[:, 0].squeeze())
+    sigma[:, 1, 1] = torch.exp(2*pred_cov[:, 1].squeeze())
+    sigma[:, 2, 2] = torch.exp(2*pred_cov[:, 2].squeeze())
 
     ## lie_algebra so3_log 사용: loss 각도 차이가 pi 근처일 때 network gradient not finite
     # pred = pred.float()
@@ -45,9 +45,10 @@ def loss_NLL_so3(pred, pred_cov, targ):
     ## lietorch
     loss = pred * targ.inverse()
     loss = compute_q_from_matrix(loss.cpu().detach().numpy())
-    loss = SO3(torch.from_numpy(loss).unsqueeze(2).transpose(1,2).cuda().float())
-    loss = loss.log()
+    loss = SO3.InitFromVec(torch.from_numpy(loss).cuda().float())
+    loss = loss.log().unsqueeze(1)
     loss.requires_grad = True  # for backpropagation
+<<<<<<< HEAD
     pred_cov = pred_cov.unsqueeze(1)
     loss = 0.5 * torch.sum(loss.square()/pred_cov, 2) + 0.5*torch.log(pred_cov.norm(dim=-1))
     # loss = 0.5*(loss.bmm(pred_cov.inverse()).bmm(loss.transpose(1,2)).squeeze()) + 0.5*(torch.log(pred_cov[:, 0, 0]*pred_cov[:, 1, 1]*pred_cov[:, 2, 2]))
@@ -55,6 +56,10 @@ def loss_NLL_so3(pred, pred_cov, targ):
     # M = pred * targ.transpose(1,2)
     # loss = torch.acos(0.5*(M[:, 0, 0]+M[:, 1, 1]+M[:, 2, 2] - 1))
     # loss = 0.5*loss.square() / pred_cov.norm(dim=-1) + 0.5*torch.log(pred_cov.norm(dim=-1))
+=======
+    # loss = 0.5 * torch.sum(loss**2/pred_cov, 1) + 0.5*torch.log(pred_cov.norm(dim=-1))
+    loss = 0.5*(loss.bmm(sigma.inverse()).bmm(loss.transpose(1,2)).squeeze()) + 0.5*(torch.log(sigma[:, 0, 0]*sigma[:, 1, 1]*sigma[:, 2, 2]))
+>>>>>>> 8843c6149b984b70ac45ccbcbfe732021c1fec65
 
     # NaN Debugging for so3_log
     # if torch.any(torch.isnan(loss)):
@@ -163,7 +168,7 @@ def get_loss(pred, pred_logstd, targ, epoch):
 
 def get_loss_so3(pred, pred_logstd, targ, epoch):
 
-    if epoch < 0:
+    if epoch < 10:
         loss = loss_geo_so3(pred, targ)
     else:
         loss = loss_NLL_so3(pred, pred_logstd, targ)
