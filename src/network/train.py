@@ -7,6 +7,7 @@ import os
 import signal
 import sys
 import time
+import datetime
 from functools import partial
 from os import path as osp
 
@@ -302,7 +303,7 @@ def write_summary(summary_writer, attr_dict, epoch, optimizer, mode):
     """ Given the attr_dict write summary and log the losses """
 
     mse_loss = np.mean((attr_dict["targets"] - attr_dict["preds"]) ** 2, axis=0)  #shape (3,3)
-    mse_so3_loss = loss_mse_so3(attr_dict["preds"], attr_dict["targets"]).cpu().detach().numpy().sqrt()   #pred와 targ각도차
+    mse_so3_loss = (loss_mse_so3(attr_dict["preds"], attr_dict["targets"])**(0.5)).cpu().detach().numpy()   #pred와 targ각도차
     ml_loss = np.average(attr_dict["losses"])  #shape (1)
     sigmas = np.exp(attr_dict["preds_cov"])  #shape (3,3)
     # print("mse_loss size: ", mse_loss.shape)
@@ -326,7 +327,7 @@ def write_summary(summary_writer, attr_dict, epoch, optimizer, mode):
             "optimizer/lr", optimizer.param_groups[0]["lr"], epoch - 1
         )
     logging.info(
-        f"{mode}: average ml loss: {ml_loss}, average mse loss: {np.mean(mse_loss)}, average mse so3 loss: {mse_so3_loss}"
+        f"{mode}: average ml loss: {ml_loss}, average mse loss: {np.mean(mse_loss)}, average mse so3 loss: {np.mean(mse_so3_loss)}"
     )
 
 
@@ -533,7 +534,8 @@ def net_train(args):
                 f"Detected saved checkpoint, starting from epoch {start_epoch}"
             )
 
-    summary_writer = SummaryWriter(osp.join(args.out_dir, "logs"))
+    title = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+    summary_writer = SummaryWriter(osp.join(args.out_dir, f"logs/{title}"))
     summary_writer.add_text("info", f"total_param: {total_params}")
 
     logging.info(f"-------------- Init, Epoch {start_epoch} --------------")

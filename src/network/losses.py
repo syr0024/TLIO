@@ -207,7 +207,7 @@ def get_loss(pred, pred_logstd, targ, epoch):
 def get_loss_so3(pred, pred_logstd, targ, epoch):
 
     if epoch < 10:
-        loss = loss_mse_so3(pred, targ)
+        loss = loss_geo_so3(pred, targ)
     else:
         loss = loss_NLL_so3(pred, pred_logstd, targ)
 
