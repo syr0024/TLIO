@@ -29,7 +29,7 @@ if __name__ == "__main__":
     parser.add_argument("--out_name", type=str, default=None)
 
     # ------------------ architecture and training -----------------
-    parser.add_argument("--lr", type=float, default=1e-03)
+    parser.add_argument("--lr", type=float, default=1e-02)
     parser.add_argument("--batch_size", type=int, default=1024)
     parser.add_argument("--epochs", type=int, default=10000, help="max num epochs")
     parser.add_argument("--arch", type=str, default="resnet")
