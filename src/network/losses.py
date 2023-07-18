@@ -8,6 +8,61 @@ from utils.math_utils import logdet3, sixD2so3, so32sixD
 
 MIN_LOG_STD = np.log(1e-3)
 
+def rotation_matrix_to_euler_angles(rotation_matrices):
+    euler_angles = torch.zeros((rotation_matrices.shape[0], 3), device=rotation_matrices.device)
+
+    for i in range(rotation_matrices.shape[0]):
+        R = rotation_matrices[i]
+
+        if R[2, 0] < 1:
+            if R[2, 0] > -1:
+                theta_x = torch.asin(R[2, 0])
+                theta_y = torch.atan2(-R[2, 1], R[2, 2])
+                theta_z = torch.atan2(-R[1, 0], R[0, 0])
+            else:
+                theta_x = -torch.tensor(np.pi / 2)
+                theta_y = -torch.atan2(R[0, 1], R[0, 2])
+                theta_z = torch.tensor(0)
+        else:
+            theta_x = torch.tensor(np.pi / 2)
+            theta_y = torch.atan2(R[0, 1], R[0, 2])
+            theta_z = torch.tensor(0)
+
+        euler_angles[i] = torch.tensor([theta_x, theta_y, theta_z])
+
+    return euler_angles
+
+def euler_angles_to_rotation_matrix(euler_angles):
+    rotation_matrices = torch.zeros((euler_angles.shape[0], 3, 3), device=euler_angles.device)
+
+    for i in range(euler_angles.shape[0]):
+        angles = euler_angles[i]
+        theta_x, theta_y, theta_z = angles[0], angles[1], angles[2]
+
+        cos_x = torch.cos(theta_x)
+        sin_x = torch.sin(theta_x)
+        cos_y = torch.cos(theta_y)
+        sin_y = torch.sin(theta_y)
+        cos_z = torch.cos(theta_z)
+        sin_z = torch.sin(theta_z)
+
+        rotation_x = torch.tensor([[1, 0, 0],
+                                   [0, cos_x, -sin_x],
+                                   [0, sin_x, cos_x]], device=euler_angles.device)
+
+        rotation_y = torch.tensor([[cos_y, 0, sin_y],
+                                   [0, 1, 0],
+                                   [-sin_y, 0, cos_y]], device=euler_angles.device)
+
+        rotation_z = torch.tensor([[cos_z, -sin_z, 0],
+                                   [sin_z, cos_z, 0],
+                                   [0, 0, 1]], device=euler_angles.device)
+
+        rotation_matrices[i] = torch.matmul(torch.matmul(rotation_z, rotation_y), rotation_x)
+
+    return rotation_matrices
+
+
 """
 SO(3) loss
 
@@ -20,6 +75,13 @@ output:
 
 def loss_geo_so3(pred, targ):
     "Geodesic Loss of SO3"
+    pred = rotation_matrix_to_euler_angles(pred)
+    pred[:, -1] = 0
+    pred = euler_angles_to_rotation_matrix(pred)
+    targ = rotation_matrix_to_euler_angles(targ)
+    targ[:, -1] = 0
+    targ = euler_angles_to_rotation_matrix(targ)
+
     M = pred * targ.transpose(1,2)
     loss = torch.acos(0.5*(M[:, 0, 0]+M[:, 1, 1]+M[:, 2, 2] - 1))
 
@@ -27,7 +89,7 @@ def loss_geo_so3(pred, targ):
     # loss = compute_q_from_matrix(loss.cpu().detach().numpy())
     # loss = SO3(torch.from_numpy(loss).unsqueeze(2).transpose(1,2).cuda().float())
     # loss = loss.log().norm(dim=-1).squeeze()
-    # loss.requires_grad = True
+    loss.requires_grad = True
     return loss
 
 
@@ -165,8 +227,8 @@ def get_loss(pred, pred_logstd, targ, epoch):
 def get_loss_so3(pred, pred_logstd, targ, epoch):
 
     if epoch < 1000:
-        # loss = loss_geo_so3(pred, targ)
-        loss = (pred - targ).pow(2)
+        loss = loss_geo_so3(pred, targ)
+        # loss = (pred - targ).pow(2)
     else:
         loss = loss_NLL_so3(pred, pred_logstd, targ)
 
