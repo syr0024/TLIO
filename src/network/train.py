@@ -592,7 +592,7 @@ def net_train(args):
         )
 
         logging.info(f"-------------- Training, Epoch {epoch} ---------------")
-        logging.info(f"lr: {lr}")
+        # logging.info(f"lr: {lr}")
         start_t = time.time()
         train_attr_dict = do_train_R(network, train_loader, device, epoch, optimizer, train_transforms)
         write_summary(summary_writer, train_attr_dict, epoch, optimizer, "train")
