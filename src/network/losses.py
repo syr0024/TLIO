@@ -45,8 +45,8 @@ def loss_NLL_so3(pred, pred_cov, targ):
     ## lietorch
     loss = pred * targ.inverse()
     loss = compute_q_from_matrix(loss.cpu().detach().numpy())
-    loss = SO3.InitFromVec(torch.from_numpy(loss).cuda().float())
-    loss = loss.log().unsqueeze(1)
+    loss = SO3(torch.from_numpy(loss).unsqueeze(2).transpose(1,2).cuda().float())
+    loss = loss.log()
     loss.requires_grad = True  # for backpropagation
     # loss = 0.5 * torch.sum(loss**2/pred_cov, 1) + 0.5*torch.log(pred_cov.norm(dim=-1))
     loss = 0.5*(loss.bmm(sigma.inverse()).bmm(loss.transpose(1,2)).squeeze()) + 0.5*(torch.log(sigma[:, 0, 0]*sigma[:, 1, 1]*sigma[:, 2, 2]))
