@@ -20,8 +20,13 @@ output:
 
 def loss_geo_so3(pred, targ):
     "Geodesic Loss of SO3"
-    M = pred * targ.transpose(1,2)
-    loss = torch.acos(0.5*(M[:, 0, 0]+M[:, 1, 1]+M[:, 2, 2] - 1))
+    # M = pred * targ.transpose(1,2)
+    # loss = torch.acos(0.5*(M[:, 0, 0]+M[:, 1, 1]+M[:, 2, 2] - 1))
+    loss = pred * targ.inverse()
+    loss = compute_q_from_matrix(loss.cpu().detach().numpy())
+    loss = SO3(torch.from_numpy(loss).unsqueeze(2).transpose(1,2).cuda().float())
+    loss = loss.log().norm(dim=-1)
+    loss.requires_grad = True
     return loss
 
 
@@ -158,7 +163,7 @@ def get_loss(pred, pred_logstd, targ, epoch):
 
 def get_loss_so3(pred, pred_logstd, targ, epoch):
 
-    if epoch < 10:
+    if epoch < 1000:
         loss = loss_geo_so3(pred, targ)
     else:
         loss = loss_NLL_so3(pred, pred_logstd, targ)
