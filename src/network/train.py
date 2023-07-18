@@ -571,17 +571,17 @@ def net_train(args):
     best_val_loss = np.inf
     for epoch in range(start_epoch + 1, args.epochs):
 
-        if epoch<20:
-            lr = 0.1
-        elif epoch<40:
-            lr = 0.05
-        else:
-            lr = 0.01
-
-        optimizer = torch.optim.Adam(network.parameters(), lr)
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, factor=0.1, patience=10, verbose=True, eps=1e-12
-        )
+        # if epoch<20:
+        #     lr = 0.1
+        # elif epoch<40:
+        #     lr = 0.05
+        # else:
+        #     lr = 0.01
+        #
+        # optimizer = torch.optim.Adam(network.parameters(), lr)
+        # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        #     optimizer, factor=0.1, patience=10, verbose=True, eps=1e-12
+        # )
 
         signal.signal(
             signal.SIGINT, partial(stop_signal_handler, args, epoch, network, optimizer)
