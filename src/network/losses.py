@@ -75,16 +75,29 @@ output:
 
 def loss_geo_so3(pred, targ):
     "Geodesic Loss of SO3"
+    M = pred * targ.transpose(1,2)
+    loss = torch.acos(0.5*(M[:, 0, 0]+M[:, 1, 1]+M[:, 2, 2] - 1))
+
+    ## lietorch
+    # loss = pred * targ.inverse()
+    # loss = compute_q_from_matrix(loss.cpu().detach().numpy())
+    # loss = SO3(torch.from_numpy(loss).unsqueeze(2).transpose(1,2).cuda().float())
+    # loss = loss.log().norm(dim=-1).squeeze()
+    loss.requires_grad = True
+    return loss
+
+def loss_geo_euler_so3(pred, targ):
     pred = rotation_matrix_to_euler_angles(pred)
     pred[:, -1] = 0
     pred = euler_angles_to_rotation_matrix(pred)
     targ = rotation_matrix_to_euler_angles(targ)
     targ[:, -1] = 0
     targ = euler_angles_to_rotation_matrix(targ)
-
+    "Geodesic Loss of SO3"
     M = pred * targ.transpose(1,2)
     loss = torch.acos(0.5*(M[:, 0, 0]+M[:, 1, 1]+M[:, 2, 2] - 1))
 
+    ## lietorch
     # loss = pred * targ.inverse()
     # loss = compute_q_from_matrix(loss.cpu().detach().numpy())
     # loss = SO3(torch.from_numpy(loss).unsqueeze(2).transpose(1,2).cuda().float())
@@ -227,7 +240,7 @@ def get_loss(pred, pred_logstd, targ, epoch):
 def get_loss_so3(pred, pred_logstd, targ, epoch):
 
     if epoch < 1000:
-        loss = loss_geo_so3(pred, targ)
+        loss = loss_geo_euler_so3(pred, targ)
         # loss = (pred - targ).pow(2)
     else:
         loss = loss_NLL_so3(pred, pred_logstd, targ)
