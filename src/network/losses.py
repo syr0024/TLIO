@@ -100,7 +100,7 @@ def loss_geo_so3(pred, targ):
     # loss = compute_q_from_matrix(loss.cpu().detach().numpy())
     # loss = SO3(torch.from_numpy(loss).unsqueeze(2).transpose(1,2).cuda().float())
     # loss = loss.log().norm(dim=-1).squeeze()
-    loss.requires_grad = True
+    # loss.requires_grad = True
     return loss
 
 
