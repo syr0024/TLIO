@@ -12,7 +12,7 @@
     "imu_base_freq": 1000.0,
     "imu_freq": 200.0,
     "input_dim": 6,
-    "lr": 0.0001,
+    "lr": 0.01,
     "mode": "train",
     "model_path": null,
     "out_dir": "../models/resnet",

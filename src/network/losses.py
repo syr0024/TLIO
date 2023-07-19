@@ -103,6 +103,19 @@ def loss_geo_so3(pred, targ):
 
     return loss
 
+def loss_body_gravity_so3(pred, targ):
+    # pred = rotation_matrix_to_euler(pred)
+    # pred[:, -1] = 0
+    # pred = euler_angles_to_rotation_matrix(pred)
+    # targ = rotation_matrix_to_euler(targ)
+    # targ[:, -1] = 0
+    # targ = euler_angles_to_rotation_matrix(targ)
+    # pred.requires_grad = True
+    # targ.requires_grad = True
+    "compare gravity vector in body frame"
+    loss = np.norm((pred[2,:]-targ[2,:]))
+
+    return loss
 
 def loss_NLL_so3(pred, pred_cov, targ):
 
@@ -237,10 +250,11 @@ def get_loss(pred, pred_logstd, targ, epoch):
 
 def get_loss_so3(pred, pred_logstd, targ, epoch):
 
-    if epoch < 1000:
-        loss = loss_geo_so3(pred, targ)
-        # loss = (pred - targ).pow(2)
-    else:
-        loss = loss_NLL_so3(pred, pred_logstd, targ)
+    # if epoch < 1000:
+    #     loss = loss_geo_so3(pred, targ)
+    #     # loss = (pred - targ).pow(2)
+    # else:
+    #     loss = loss_NLL_so3(pred, pred_logstd, targ)
+    loss = loss_body_gravity_so3(pred,targ)
 
     return loss
