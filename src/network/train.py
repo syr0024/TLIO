@@ -15,7 +15,7 @@ import numpy as np
 import torch
 # from dataloader.dataset_fb import FbSequenceDataset
 from dataloader.tlio_data import TlioData
-from network.losses import get_loss, get_loss_so3, loss_geo_so3
+from network.losses import get_loss, get_loss_so3, loss_euler
 from network.model_factory import get_model
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
@@ -104,7 +104,6 @@ def get_inference_so3(network, data_loader, device, epoch, transforms=[]):
             # targ = sample["targ_dR_World"][:, 1:, :, :].permute(0, 2, 3, 1) # dR 학습하는 경우 사용
 
         loss = get_loss_so3(pred, pred_cov, targ, epoch)
-        # loss = loss_geo_so3(pred, targ) # dR 학습하는 경우 사용
 
         targets_all.append(torch_to_numpy(targ))
         preds_all.append(torch_to_numpy(pred))
@@ -289,7 +288,7 @@ def do_train_dR(network, train_loader, device, epoch, optimizer, transforms=[]):
             targ = sample["targ_dR_World"][:, 1:, :, :].permute(0, 2, 3, 1) # trag: (1024, 3, 3, 199)
             #targ = so32sixD(targ)  # trag: (1024, 6, 199)
 
-        loss = loss_geo_so3(pred, targ)
+        loss = get_loss_so3(pred, targ)
         # loss = get_loss_so3(pred, pred_cov, targ, epoch)
 
         train_targets.append(torch_to_numpy(targ))
@@ -319,7 +318,7 @@ def write_summary(summary_writer, attr_dict, epoch, optimizer, mode):
     """ Given the attr_dict write summary and log the losses """
 
     mse_loss = np.mean((attr_dict["targets"] - attr_dict["preds"]) ** 2, axis=0)  #shape (3,3)
-    mse_so3_loss = (loss_geo_so3(torch.from_numpy(attr_dict["preds"]), torch.from_numpy(attr_dict["targets"]))).cpu().detach().numpy()
+    euler_loss = (loss_euler(torch.from_numpy(attr_dict["preds"]), torch.from_numpy(attr_dict["targets"])))#.cpu().detach().numpy()
     ml_loss = np.average(attr_dict["losses"])  #shape (1)
     sigmas = np.exp(attr_dict["preds_cov"])  #shape (3,3)
     # print("mse_loss size: ", mse_loss.shape)
@@ -332,7 +331,7 @@ def write_summary(summary_writer, attr_dict, epoch, optimizer, mode):
     #     assert sigmas.shape[1] == 3
     #     sigmas = sigmas[:, :, -1]
     summary_writer.add_scalar(f"{mode}_loss/mse_loss_avg", np.mean(mse_loss), epoch)
-    summary_writer.add_scalar(f"{mode}_loss/mse_so3_loss_avg", np.mean(mse_so3_loss), epoch)
+    summary_writer.add_scalar(f"{mode}_loss/euler_loss_avg", euler_loss.mean(dim=-1), epoch)
     summary_writer.add_scalar(f"{mode}_loss/loss_full", ml_loss, epoch)
     summary_writer.add_scalar(f"{mode}_dist/sigma_x", np.mean(sigmas[:, 0]), epoch)
     summary_writer.add_scalar(f"{mode}_dist/sigma_y", np.mean(sigmas[:, 1]), epoch)
