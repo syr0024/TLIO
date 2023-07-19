@@ -250,11 +250,11 @@ def get_loss(pred, pred_logstd, targ, epoch):
 
 def get_loss_so3(pred, pred_logstd, targ, epoch):
 
-    # if epoch < 1000:
-    #     loss = loss_geo_so3(pred, targ)
-    #     # loss = (pred - targ).pow(2)
-    # else:
-    #     loss = loss_NLL_so3(pred, pred_logstd, targ)
-    loss = loss_body_gravity_so3(pred,targ)
+    if epoch < 1000:
+        loss = loss_geo_so3(pred, targ)
+        # loss = (pred - targ).pow(2)
+    else:
+        loss = loss_NLL_so3(pred, pred_logstd, targ)
+    # loss = loss_body_gravity_so3(pred,targ)
 
     return loss
