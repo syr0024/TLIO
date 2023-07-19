@@ -344,7 +344,10 @@ def write_summary(summary_writer, attr_dict, epoch, optimizer, mode):
             "optimizer/lr", optimizer.param_groups[0]["lr"], epoch - 1
         )
     logging.info(
-        f"{mode}: average ml loss: {ml_loss}, average mse loss: {np.mean(mse_loss)}, average mse so3 loss: {np.mean(mse_so3_loss)}"
+        f"{mode}: average ml loss: {ml_loss}, average mse loss: {np.mean(mse_loss)}"
+        f", average roll loss: {np.mean(euler_loss[:,0])}"
+        f", average pitch loss: {np.mean(euler_loss[:,1])}"
+        f", average yaw loss: {np.mean(euler_loss[:,2])}"
     )
 
 
