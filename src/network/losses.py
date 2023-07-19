@@ -113,7 +113,7 @@ def loss_body_gravity_so3(pred, targ):
     # pred.requires_grad = True
     # targ.requires_grad = True
     "compare gravity vector in body frame"
-    loss = np.norm((pred[2,:]-targ[2,:]))
+    loss = torch.norm((pred[2,:]-targ[2,:]))
 
     return loss
 
