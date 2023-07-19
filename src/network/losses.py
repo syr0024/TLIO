@@ -58,7 +58,7 @@ def euler_angles_to_rotation_matrix(euler_angles):
                                    [sin_z, cos_z, 0],
                                    [0, 0, 1]], device=euler_angles.device)
 
-        rotation_matrices[i] = torch.matmul(torch.matmul(rotation_z, rotation_y), rotation_x)
+        rotation_matrices[i] = torch.matmul(torch.matmul(rotation_x, rotation_y), rotation_z)
 
     return rotation_matrices
 
