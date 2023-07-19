@@ -269,28 +269,28 @@ class SequencesDataset:
         R_W_i = Rotation.from_quat(rot).as_matrix()
         targ_dR_World, targ_dt_World = self.poses_to_target(rot, pos)
 
-        R_world_gla = np.eye(3)
-        if self.genparams.express_in_t0_yaw_normalized_frame:
-            assert False
-            R_W_0 = Rotation.from_quat(rot[0:1]).as_matrix()
-            angles_t0 = compute_euler_from_matrix(
-                R_W_0, "xyz", extrinsic=True
-            )
-            ri_z = angles_t0[0,2]
-            c = np.cos(ri_z)
-            s = np.sin(ri_z)
-            R_world_gla = np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]])
-            targ_dt_World = np.einsum("ji,tj->ti", R_world_gla, targ_dt_World)
-
-            # Only IMU and mag data need to be rotated (not barometer)
-            for k, v in feats.items():
-                if "imu" in k:
-                    assert feats[k].shape[0] == 6
-                    feats[k][:3] = np.einsum("ji,jt->it", R_world_gla, feats[k][:3])
-                    feats[k][3:] = np.einsum("ji,jt->it", R_world_gla, feats[k][3:])
-                elif "mag" in k:
-                    assert feats[k].shape[0] == 3
-                    feats[k] = np.einsum("ji,jt->it", R_world_gla, feats[k])
+        # R_world_gla = np.eye(3)
+        # if self.genparams.express_in_t0_yaw_normalized_frame:
+        #     assert False
+        #     R_W_0 = Rotation.from_quat(rot[0:1]).as_matrix()
+        #     angles_t0 = compute_euler_from_matrix(
+        #         R_W_0, "xyz", extrinsic=True
+        #     )
+        #     ri_z = angles_t0[0,2]
+        #     c = np.cos(ri_z)
+        #     s = np.sin(ri_z)
+        #     R_world_gla = np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]])
+        #     targ_dt_World = np.einsum("ji,tj->ti", R_world_gla, targ_dt_World)
+        #
+        #     # Only IMU and mag data need to be rotated (not barometer)
+        #     for k, v in feats.items():
+        #         if "imu" in k:
+        #             assert feats[k].shape[0] == 6
+        #             feats[k][:3] = np.einsum("ji,jt->it", R_world_gla, feats[k][:3])
+        #             feats[k][3:] = np.einsum("ji,jt->it", R_world_gla, feats[k][3:])
+        #         elif "mag" in k:
+        #             assert feats[k].shape[0] == 3
+        #             feats[k] = np.einsum("ji,jt->it", R_world_gla, feats[k])
         
         # We may return multiple windows, so place them all in here for convenience.
         windows = {
@@ -301,7 +301,7 @@ class SequencesDataset:
                 "targ_dR_World": targ_dR_World.astype(np.float32),
                 "targ_dt_World": targ_dt_World.astype(np.float32),
                 "vel_World": vel.astype(np.float32),
-                "R_world_gla": R_world_gla,
+                #"R_world_gla": R_world_gla,
             }
         }
 

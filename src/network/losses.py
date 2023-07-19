@@ -89,6 +89,8 @@ def loss_geo_so3(pred, targ):
     # targ = rotation_matrix_to_euler_angles(targ)
     # targ[:, -1] = 0
     # targ = euler_angles_to_rotation_matrix(targ)
+    # pred.requires_grad = True
+    # targ.requires_grad = True
     "Geodesic Loss of SO3"
     M = pred * targ.transpose(1,2)
     loss = torch.acos(0.5*(M[:, 0, 0]+M[:, 1, 1]+M[:, 2, 2] - 1))
@@ -98,7 +100,7 @@ def loss_geo_so3(pred, targ):
     # loss = compute_q_from_matrix(loss.cpu().detach().numpy())
     # loss = SO3(torch.from_numpy(loss).unsqueeze(2).transpose(1,2).cuda().float())
     # loss = loss.log().norm(dim=-1).squeeze()
-    # loss.requires_grad = True
+
     return loss
 
 
