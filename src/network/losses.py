@@ -8,27 +8,27 @@ from utils.math_utils import logdet3, sixD2so3, so32sixD
 
 MIN_LOG_STD = np.log(1e-3)
 
-def rotation_matrix_to_euler_angles(rotation_matrices):
-    euler_angles = torch.zeros((rotation_matrices.shape[0], 3), device=rotation_matrices.device)
+def rotation_matrix_to_euler(rot_matrices):
+    device = rot_matrices.device
+    batch_size = rot_matrices.shape[0]
+    euler_angles = torch.empty((batch_size, 3), device=device)
 
-    for i in range(rotation_matrices.shape[0]):
-        R = rotation_matrices[i]
+    for i in range(batch_size):
+        R = rot_matrices[i]
 
-        if R[2, 0] < 1:
-            if R[2, 0] > -1:
-                theta_x = torch.asin(R[2, 0])
-                theta_y = torch.atan2(-R[2, 1], R[2, 2])
-                theta_z = torch.atan2(-R[1, 0], R[0, 0])
-            else:
-                theta_x = -torch.tensor(np.pi / 2)
-                theta_y = -torch.atan2(R[0, 1], R[0, 2])
-                theta_z = torch.tensor(0)
+        # Calculate pitch
+        pitch = torch.asin(-R[2, 0])
+        cos_pitch = torch.cos(pitch)
+
+        # Calculate roll and yaw
+        if torch.abs(cos_pitch) > 1e-6:
+            roll = torch.atan2(R[2, 1] / cos_pitch, R[2, 2] / cos_pitch)
+            yaw = torch.atan2(R[1, 0] / cos_pitch, R[0, 0] / cos_pitch)
         else:
-            theta_x = torch.tensor(np.pi / 2)
-            theta_y = torch.atan2(R[0, 1], R[0, 2])
-            theta_z = torch.tensor(0)
+            roll = 0.0
+            yaw = torch.atan2(-R[0, 1], R[1, 1])
 
-        euler_angles[i] = torch.tensor([theta_x, theta_y, theta_z])
+        euler_angles[i] = torch.tensor([roll, pitch, yaw], device=device)
 
     return euler_angles
 
@@ -75,18 +75,18 @@ output:
 
 def loss_euler(pred, targ):
     "Geodesic Loss of SO3"
-    pred = rotation_matrix_to_euler_angles(pred)
-    targ = rotation_matrix_to_euler_angles(targ)
+    pred = rotation_matrix_to_euler(pred)
+    targ = rotation_matrix_to_euler(targ)
     loss = pred - targ
 
     loss.requires_grad = True
     return loss
 
 def loss_geo_so3(pred, targ):
-    # pred = rotation_matrix_to_euler_angles(pred)
+    # pred = rotation_matrix_to_euler(pred)
     # pred[:, -1] = 0
     # pred = euler_angles_to_rotation_matrix(pred)
-    # targ = rotation_matrix_to_euler_angles(targ)
+    # targ = rotation_matrix_to_euler(targ)
     # targ[:, -1] = 0
     # targ = euler_angles_to_rotation_matrix(targ)
     # pred.requires_grad = True
