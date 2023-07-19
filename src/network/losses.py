@@ -76,9 +76,7 @@ output:
 def loss_euler(pred, targ):
     "Geodesic Loss of SO3"
     pred = rotation_matrix_to_euler_angles(pred)
-    pred[:, -1] = 0
     targ = rotation_matrix_to_euler_angles(targ)
-    targ[:, -1] = 0
     loss = pred - targ
 
     loss.requires_grad = True
