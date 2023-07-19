@@ -318,7 +318,7 @@ def write_summary(summary_writer, attr_dict, epoch, optimizer, mode):
     """ Given the attr_dict write summary and log the losses """
 
     mse_loss = np.mean((attr_dict["targets"] - attr_dict["preds"]) ** 2, axis=0)  #shape (3,3)
-    euler_loss = (loss_euler(torch.from_numpy(attr_dict["preds"]), torch.from_numpy(attr_dict["targets"]))).cpu().detach().numpy()
+    # euler_loss = (loss_euler(torch.from_numpy(attr_dict["preds"]), torch.from_numpy(attr_dict["targets"]))).cpu().detach().numpy()
     ml_loss = np.average(attr_dict["losses"])  #shape (1)
     sigmas = np.exp(attr_dict["preds_cov"])  #shape (3,3)
     # print("mse_loss size: ", mse_loss.shape)
@@ -331,9 +331,9 @@ def write_summary(summary_writer, attr_dict, epoch, optimizer, mode):
     #     assert sigmas.shape[1] == 3
     #     sigmas = sigmas[:, :, -1]
     summary_writer.add_scalar(f"{mode}_loss/mse_loss_avg", np.mean(mse_loss), epoch)
-    summary_writer.add_scalar(f"{mode}_loss/euler_roll_loss", np.mean(euler_loss[:,0]), epoch)
-    summary_writer.add_scalar(f"{mode}_loss/euler_pitch_loss", np.mean(euler_loss[:,1]), epoch)
-    summary_writer.add_scalar(f"{mode}_loss/euler_yaw_loss", np.mean(euler_loss[:,2]), epoch)
+    # summary_writer.add_scalar(f"{mode}_loss/euler_roll_loss", np.mean(euler_loss[:,0]), epoch)
+    # summary_writer.add_scalar(f"{mode}_loss/euler_pitch_loss", np.mean(euler_loss[:,1]), epoch)
+    # summary_writer.add_scalar(f"{mode}_loss/euler_yaw_loss", np.mean(euler_loss[:,2]), epoch)
     summary_writer.add_scalar(f"{mode}_loss/loss_full", ml_loss, epoch)
     summary_writer.add_scalar(f"{mode}_dist/sigma_x", np.mean(sigmas[:, 0]), epoch)
     summary_writer.add_scalar(f"{mode}_dist/sigma_y", np.mean(sigmas[:, 1]), epoch)
@@ -346,11 +346,11 @@ def write_summary(summary_writer, attr_dict, epoch, optimizer, mode):
     logging.info(
         f"{mode}: average ml loss: {ml_loss}, average mse loss: {np.mean(mse_loss)}"
     )
-    logging.info(
-        f", average roll loss: {np.mean(euler_loss[:,0])}"
-        f", average pitch loss: {np.mean(euler_loss[:,1])}"
-        f", average yaw loss: {np.mean(euler_loss[:,2])}"
-    )
+    # logging.info(
+    #     f", average roll loss: {np.mean(euler_loss[:,0])}"
+    #     f", average pitch loss: {np.mean(euler_loss[:,1])}"
+    #     f", average yaw loss: {np.mean(euler_loss[:,2])}"
+    # )
 
 
 def save_model(args, epoch, network, optimizer, best, interrupt=False):
