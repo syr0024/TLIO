@@ -319,7 +319,7 @@ def write_summary(summary_writer, attr_dict, epoch, optimizer, mode):
     # select data random
     # N = attr_dict["preds"].size(0)
     data = torch.randn(1024,3,3)
-    random_indices = torch.randperm(N)[:10]
+    random_indices = torch.randperm(1024)[:10]
     sub_targ = data[random_indices]
     sub_pred = data[random_indices]
 
