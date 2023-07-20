@@ -320,10 +320,12 @@ def write_summary(summary_writer, attr_dict, epoch, optimizer, mode):
     # N = attr_dict["preds"].size(0)
     data = torch.randn(1024,3,3)
     random_indices = torch.randperm(1024)[:10]
-    sub_targ = data[torch.from_numpy(attr_dict["preds"]), random_indices]
-    sub_pred = data[torch.from_numpy(attr_dict["targets"]), random_indices]
+    targ = torch.from_numpy(attr_dict["targets"])
+    pred = torch.from_numpy(attr_dict["preds"])
+    sub_targ = targ[random_indices]
+    sub_pred = pred[random_indices]
 
-    mse_loss = np.mean((attr_dict["targets"] - attr_dict["preds"]) ** 2, axis=0)  #shape (3,3)
+    mse_loss = np.mean((targ - pred) ** 2, axis=0)  #shape (3,3)
     euler_loss = (loss_euler(sub_targ, sub_pred).abs()).cpu().detach().numpy()
     ml_loss = np.average(attr_dict["losses"])  #shape (1)
     sigmas = np.exp(attr_dict["preds_cov"])  #shape (3,3)
