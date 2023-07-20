@@ -156,7 +156,7 @@ def do_train(network, train_loader, device, epoch, optimizer, transforms=[]):
 
         # print("Loss full: ", loss)
 
-        loss = loss.mean()
+        loss = loss.sum()
         loss.backward()
 
         # print("Loss mean: ", loss.item())
@@ -316,8 +316,14 @@ def do_train_dR(network, train_loader, device, epoch, optimizer, transforms=[]):
 
 def write_summary(summary_writer, attr_dict, epoch, optimizer, mode):
     """ Given the attr_dict write summary and log the losses """
+    # select data random
+    N = attr_dict["preds"].size(0)
+    data = torch.randn(N,3,3)
+    random_indices = torch.randperm(N)[:10]
+    sub_targ = data[random_indices]
+    sub_pred = data[random_indices]
 
-    mse_loss = np.mean((attr_dict["targets"] - attr_dict["preds"]) ** 2, axis=0)  #shape (3,3)
+    mse_loss = np.mean((sub_targ - sub_pred) ** 2, axis=0)  #shape (3,3)
     euler_loss = (loss_euler(torch.from_numpy(attr_dict["preds"]), torch.from_numpy(attr_dict["targets"]))).cpu().detach().numpy()
     ml_loss = np.average(attr_dict["losses"])  #shape (1)
     sigmas = np.exp(attr_dict["preds_cov"])  #shape (3,3)
@@ -531,7 +537,7 @@ def net_train(args):
     logging.info(f'Network "{args.arch}" loaded to device {device}')
     logging.info(f"Total number of parameters: {total_params}")
 
-    optimizer = torch.optim.Adam(network.parameters(), args.lr, weight_decay=0.025)
+    optimizer = torch.optim.Adam(network.parameters(), args.lr)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, factor=0.1, patience=10, verbose=True, eps=1e-12
     )
