@@ -317,8 +317,8 @@ def do_train_dR(network, train_loader, device, epoch, optimizer, transforms=[]):
 def write_summary(summary_writer, attr_dict, epoch, optimizer, mode):
     """ Given the attr_dict write summary and log the losses """
     # select data random
-    N = attr_dict["preds"].size(0)
-    data = torch.randn(N,3,3)
+    # N = attr_dict["preds"].size(0)
+    data = torch.randn(1024,3,3)
     random_indices = torch.randperm(N)[:10]
     sub_targ = data[random_indices]
     sub_pred = data[random_indices]
