@@ -156,7 +156,7 @@ def do_train(network, train_loader, device, epoch, optimizer, transforms=[]):
 
         # print("Loss full: ", loss)
 
-        loss = loss.sum()
+        loss = loss.mean()
         loss.backward()
 
         # print("Loss mean: ", loss.item())
@@ -230,7 +230,7 @@ def do_train_R(network, train_loader, device, epoch, optimizer, transforms=[]):
             print("loss is finite: ", torch.any(torch.isfinite(loss)))
         # =========================================== #
 
-        loss = loss.mean()
+        loss = loss.sum()
         loss.backward()
 
         # ================Debugging================== #
